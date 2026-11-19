@@ -93,12 +93,14 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            boxSizing: 'border-box'
+            boxSizing: 'border-box',
+            backgroundColor: '#ffffff',
+            fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif'
           }}
         >
           {/* Header Toko / Kategori */}
           <div className="flex justify-between items-center border-b border-black pb-0.5 leading-none">
-            <span className="text-[6px] font-black uppercase tracking-tight">ATAYA TOKO</span>
+            <span className="text-[6.5px] font-bold uppercase tracking-tight">ATAYA TOKO</span>
             <span className="text-[5px] font-bold uppercase truncate max-w-[28mm]">{product.category || product.Kategori || 'UMUM'}</span>
           </div>
 
@@ -108,23 +110,23 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
               {/* Nama Produk & Varian (Satu Baris Kompak) */}
               <div className="min-w-0">
                 <div className="flex items-center gap-1 min-w-0">
-                  <h2 className="text-[7.5px] font-black leading-tight uppercase truncate">
+                  <h2 className="text-[7.5px] font-bold leading-tight uppercase truncate">
                     {product.name || product.Nama}
                   </h2>
                   {(product.isVariant || product.parent_id || product.raw_data?.Parent_ID) && (
-                    <span className="px-1 py-0.2 bg-black text-white rounded-[2px] text-[5.5px] font-black uppercase shrink-0 leading-none">
+                    <span className="px-1 py-0.2 bg-black text-white rounded-[2px] text-[5.5px] font-bold uppercase shrink-0 leading-none">
                       {product.variantName || product.raw_data?.variantName || 'VAR'}
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Harga Utama (Tebal & Kontras) */}
+              {/* Harga Utama (Tebal & Bersih - Font Extrabold anti-gumpal) */}
               <div className="mt-0.5 flex items-baseline gap-1 leading-none">
-                <span className="text-[13.5px] font-black tracking-tighter leading-none text-slate-900">
+                <span className="text-[13.5px] font-extrabold tracking-tight leading-none text-black">
                   {formatRp(product.price || product.Ecer)}
                 </span>
-                <span className="text-[5.5px] font-bold text-gray-500 uppercase">
+                <span className="text-[5.5px] font-bold text-gray-600 uppercase">
                   /{baseUnitStr}
                 </span>
               </div>
@@ -136,10 +138,10 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
                     .filter((u: any) => u.code?.toUpperCase() !== baseUnitStr)
                     .map((u: any, idx: number) => (
                       <div key={idx} className="flex justify-between items-center leading-none text-[5px]">
-                        <span className="font-bold text-gray-600 uppercase">
-                          1 {u.code} <span className="font-normal text-gray-400">({u.contains} {baseUnitStr})</span>
+                        <span className="font-bold text-gray-700 uppercase">
+                          1 {u.code} <span className="font-normal text-gray-500">({u.contains} {baseUnitStr})</span>
                         </span>
-                        <span className="text-[6px] font-black tracking-tighter text-slate-900">
+                        <span className="text-[6px] font-bold tracking-tight text-black">
                           {formatRp(u.price)}
                         </span>
                       </div>
@@ -150,8 +152,8 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
               {/* Harga Grosir (Jika ada - Selalu Terlihat Tanpa Terpotong) */}
               {(product.wholesalePrice || product.Grosir || product.raw_data?.Grosir) > 0 && (
                 <div className="flex items-center justify-between text-[5.5px] font-bold bg-gray-100 px-1 py-0.5 rounded-[2px] mt-0.5 leading-none shrink-0">
-                  <span className="uppercase text-gray-600 font-bold">Grosir:</span>
-                  <span className="font-black text-black">
+                  <span className="uppercase text-gray-700 font-bold">Grosir:</span>
+                  <span className="font-bold text-black">
                     &ge;{product.minWholesale || product.Min_Grosir || product.raw_data?.Min_Grosir || 2} @{formatRp(product.wholesalePrice || product.Grosir || product.raw_data?.Grosir)}
                   </span>
                 </div>
@@ -163,7 +165,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
                <div className="bg-white p-0.5 w-full flex justify-center">
                  <QRCodeSVG value={skuValue} size={44} level="L" marginSize={0} />
                </div>
-               <span className="text-[4px] font-mono font-bold text-gray-700 uppercase tracking-tight mt-0.5 text-center leading-none">SKU: {skuValue}</span>
+               <span className="text-[4px] font-mono font-bold text-gray-800 uppercase tracking-tight mt-0.5 text-center leading-none">SKU: {skuValue}</span>
             </div>
           </div>
 
@@ -175,6 +177,7 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
                 width={1.15} 
                 height={18} 
                 fontSize={7} 
+                font='system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif'
                 margin={2} 
                 displayValue={true} 
                 background="#ffffff"
