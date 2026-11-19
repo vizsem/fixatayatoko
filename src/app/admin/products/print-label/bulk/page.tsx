@@ -571,29 +571,30 @@ function BulkPrintContent() {
 
                 {/* Kanan: QR Code untuk Scan Cepat via Kamera HP / Kasir (Menggunakan SKU Toko) */}
                 {showQr && (
-                  <div className="flex flex-col justify-center items-center shrink-0 w-[24mm] pl-1 border-l border-dashed border-gray-200">
+                  <div className="flex flex-col justify-center items-center shrink-0 w-[15mm] pl-1 border-l border-dashed border-gray-200">
                     <div className="bg-white p-0.5 flex justify-center">
-                      <QRCodeSVG value={skuValue} size={24} level="M" />
+                      <QRCodeSVG value={skuValue} size={42} level="L" marginSize={0} />
                     </div>
-                    <span className="text-[4.5px] font-mono font-bold text-slate-700 uppercase tracking-tight mt-0.5 text-center leading-none">
+                    <span className="text-[4px] font-mono font-bold text-slate-700 uppercase tracking-tight mt-0.5 text-center leading-none">
                       SKU: {skuValue}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Barcode Garis 1D di Bawah (Menggunakan Barcode Pabrik) */}
+              {/* Barcode Garis 1D di Bawah (Menggunakan Barcode Pabrik - Ukuran Optimal Laser Scanner) */}
               {showBarcode1D && (
-                <div className="flex items-center justify-center mt-0.5 border-t border-black pt-0.5 w-full">
-                  <div className="bg-white overflow-hidden flex justify-center w-full max-h-[14px]">
+                <div className="flex items-center justify-center mt-0.5 border-t border-black pt-0.5 w-full bg-white">
+                  <div className="w-full flex justify-center items-center">
                     <Barcode 
                       value={factoryBarcode} 
-                      width={1} 
-                      height={9} 
-                      fontSize={7} 
-                      margin={0} 
+                      width={1.2} 
+                      height={20} 
+                      fontSize={7.5} 
+                      margin={4} 
                       displayValue={true} 
-                      background="transparent"
+                      background="#ffffff"
+                      lineColor="#000000"
                     />
                   </div>
                 </div>
@@ -648,6 +649,10 @@ function BulkPrintContent() {
             }
             .page-break-here:last-child {
               page-break-after: auto !important;
+            }
+            svg {
+              shape-rendering: crispEdges !important;
+              image-rendering: pixelated !important;
             }
           }
         `

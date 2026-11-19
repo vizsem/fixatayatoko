@@ -134,29 +134,27 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
             </div>
 
             {/* Kanan: QR Code di Tengah Samping (Menggunakan SKU Toko) */}
-            <div className="flex flex-col justify-center items-center shrink-0 w-[24px]">
+            <div className="flex flex-col justify-center items-center shrink-0 w-[15mm] pl-1 border-l border-dashed border-gray-200">
                <div className="bg-white p-0.5 w-full flex justify-center">
-                 <QRCodeSVG value={skuValue} size={24} level="M" />
+                 <QRCodeSVG value={skuValue} size={42} level="L" marginSize={0} />
                </div>
-               <span className="text-[4px] font-mono font-bold text-gray-700 uppercase tracking-tight mt-1 text-center leading-tight">SKU: <br/> {skuValue}</span>
+               <span className="text-[4px] font-mono font-bold text-gray-700 uppercase tracking-tight mt-0.5 text-center leading-none">SKU: {skuValue}</span>
             </div>
           </div>
 
-          {/* Barcode Garis 1D & Keterangan Bawah (Menggunakan Barcode Pabrik) */}
-          <div className="flex items-end justify-center mt-0.5 border-t border-black pt-0.5 w-full">
-            <div className="flex flex-col w-full items-center">
-              {/* Barcode Garis (1D) */}
-              <div className="bg-white overflow-hidden flex justify-center w-full max-h-[14px]">
-                <Barcode 
-                  value={factoryBarcode} 
-                  width={1} 
-                  height={10} 
-                  fontSize={8} 
-                  margin={0} 
-                  displayValue={true} 
-                  background="transparent"
-                />
-              </div>
+          {/* Barcode Garis 1D & Keterangan Bawah (Menggunakan Barcode Pabrik - Ukuran Optimal Laser Scanner) */}
+          <div className="flex items-center justify-center mt-0.5 border-t border-black pt-0.5 w-full bg-white">
+            <div className="w-full flex justify-center items-center">
+              <Barcode 
+                value={factoryBarcode} 
+                width={1.2} 
+                height={20} 
+                fontSize={7.5} 
+                margin={4} 
+                displayValue={true} 
+                background="#ffffff"
+                lineColor="#000000"
+              />
             </div>
           </div>
         </div>
@@ -220,6 +218,10 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
               page-break-after: avoid !important;
               page-break-before: avoid !important;
               overflow: hidden !important;
+            }
+            svg {
+              shape-rendering: crispEdges !important;
+              image-rendering: pixelated !important;
             }
           }
         `
