@@ -48,8 +48,8 @@ export function calculateCustomerTierPrices({
   const ecer = Math.max(0, priceEcer || 0);
 
   // Batas bawah keselamatan (Anti-Boncos)
-  const minSemiGrosirSafe = modal > 0 ? Math.ceil((modal * 1.05) / 100) * 100 : 0;
-  const minGrosirSafe = modal > 0 ? Math.ceil((modal * 1.03) / 100) * 100 : 0;
+  const minSemiGrosirSafe = modal > 0 ? roundToStep(modal * 1.05, roundingStep) : 0;
+  const minGrosirSafe = modal > 0 ? roundToStep(modal * 1.03, roundingStep) : 0;
 
   // 1. Semi-Grosir
   let semiGrosir = Number(customSemiGrosir || 0);

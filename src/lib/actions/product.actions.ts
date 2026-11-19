@@ -1216,10 +1216,11 @@ export async function updateProductPrice(payload: {
   newMinGrosir: number;
   units?: Array<{ code: string; contains: number; price?: number; minQty?: number; label?: string }>;
   isHppLocked?: boolean;
+  roundingStep?: number;
 }): Promise<{ success: boolean; error?: string }> {
   await requireAdmin();
   try {
-    const { productId, newCost, newPrice, newSemiGrosir, newGrosir, newMinGrosir, units, isHppLocked } = payload;
+    const { productId, newCost, newPrice, newSemiGrosir, newGrosir, newMinGrosir, units, isHppLocked, roundingStep } = payload;
 
     // Ambil raw_data saat ini untuk di-merge (jangan overwrite field lain)
     const { data: currentProd, error: fetchErr } = await supabaseAdmin
@@ -1275,6 +1276,13 @@ export async function updateProductPrice(payload: {
 
     if (cleanedUnits.length > 0) {
       updatedRaw.units = cleanedUnits;
+    }
+
+    if (roundingStep && Number(roundingStep) > 0) {
+      updatedRaw.pricingStrategy = {
+        ...(existingRaw.pricingStrategy || {}),
+        roundingStep: Number(roundingStep),
+      };
     }
 
     const { error: updateErr } = await supabaseAdmin

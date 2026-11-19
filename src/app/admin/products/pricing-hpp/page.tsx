@@ -102,6 +102,11 @@ interface CostPriceLog {
   notes?: string;
 }
 
+const roundToKelipatan = (val: number, step: number = 100) => {
+  const s = step > 0 ? step : 1;
+  return Math.ceil(val / s) * s;
+};
+
 export default function PricingHPPPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -145,6 +150,7 @@ export default function PricingHPPPage() {
   const [editMinGrosir, setEditMinGrosir] = useState<number>(1);
   const [editUnits, setEditUnits] = useState<ProductUnitItem[]>([]);
   const [editIsHppLocked, setEditIsHppLocked] = useState<boolean>(false);
+  const [editRoundingStep, setEditRoundingStep] = useState<number>(100);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Form tambah satuan di Quick Edit
@@ -772,6 +778,8 @@ export default function PricingHPPPage() {
     setEditPriceGrosir(p.priceGrosir);
     setEditMinGrosir(p.minGrosir);
     setEditIsHppLocked(Boolean(p.isHppLocked));
+    const initialRounding = Number(p.pricingStrategy?.roundingStep || 100);
+    setEditRoundingStep(initialRounding > 0 ? initialRounding : 100);
 
     // Clone units list atau fallback ke base unit jika kosong
     const initialUnits: ProductUnitItem[] = p.units && p.units.length > 0
@@ -816,6 +824,7 @@ export default function PricingHPPPage() {
         newMinGrosir,
         units: syncedUnits,
         isHppLocked: editIsHppLocked,
+        roundingStep: editRoundingStep,
       });
 
       if (!result.success) throw new Error(result.error || 'Gagal menyimpan');
@@ -1826,6 +1835,25 @@ export default function PricingHPPPage() {
                   </h4>
                 </div>
                 <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Selector Kelipatan Pembulatan */}
+                  <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200" title="Kelipatan pembulatan harga jual di bilangan akhiran">
+                    <span className="text-[9px] font-black uppercase text-slate-500 pl-1.5 pr-0.5">Bulatkan:</span>
+                    {[50, 100, 500, 1000].map(step => (
+                      <button
+                        key={step}
+                        type="button"
+                        onClick={() => setEditRoundingStep(step)}
+                        className={`px-1.5 py-0.5 rounded-lg text-[10px] font-black transition-all ${
+                          editRoundingStep === step
+                            ? 'bg-blue-600 text-white shadow-2xs'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
+                        }`}
+                      >
+                        {step === 1000 ? '1rb' : step}
+                      </button>
+                    ))}
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -1836,12 +1864,13 @@ export default function PricingHPPPage() {
                           cost: unitCost,
                           name: editingProduct.name,
                           category: editingProduct.category,
+                          roundingStep: editRoundingStep,
                         });
-                        const newPrice = rec ? rec.recommendedPrice : Math.ceil((unitCost * 1.15) / 100) * 100;
+                        const newPrice = rec ? rec.recommendedPrice : roundToKelipatan(unitCost * 1.15, editRoundingStep);
                         if (isBase) setEditPriceEcer(newPrice);
                         return { ...u, price: newPrice };
                       }));
-                      notify.success('Semua satuan diset ke harga rekomendasi aman!');
+                      notify.success(`Semua satuan diset ke harga rekomendasi (Bulat Rp ${editRoundingStep})!`);
                     }}
                     className="text-[11px] font-black text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-xl transition-colors flex items-center gap-1"
                     title="Set semua satuan ke harga rekomendasi margin target agar peringatan 'Perlu naik' hilang"
@@ -1918,7 +1947,7 @@ export default function PricingHPPPage() {
                           {
                             code: cleanCode,
                             contains: newUnitContains,
-                            price: newUnitPrice > 0 ? newUnitPrice : Math.ceil((editModalCost * newUnitContains * 1.2) / 100) * 100,
+                            price: newUnitPrice > 0 ? newUnitPrice : roundToKelipatan(editModalCost * newUnitContains * 1.2, editRoundingStep),
                           }
                         ]);
                         setShowAddUnitRow(false);
@@ -1946,6 +1975,7 @@ export default function PricingHPPPage() {
                     cost: unitCost,
                     name: editingProduct.name,
                     category: editingProduct.category,
+                    roundingStep: editRoundingStep,
                   });
                   const isBelowTarget = Boolean(rec && currentPrice < rec.recommendedPrice);
 
@@ -2061,6 +2091,7 @@ export default function PricingHPPPage() {
                                       cost: unitCost,
                                       name: editingProduct.name,
                                       category: editingProduct.category,
+                                      roundingStep: editRoundingStep,
                                     });
                                     if (rec) {
                                       const targetPrice = rec.recommendedPrice;
@@ -2094,7 +2125,7 @@ export default function PricingHPPPage() {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const targetPrice = Math.round((editPriceEcer * (u.contains || 1) * 0.95) / 100) * 100;
+                                    const targetPrice = roundToKelipatan(editPriceEcer * (u.contains || 1) * 0.95, editRoundingStep);
                                     setEditUnits(prev => {
                                       const next = [...prev];
                                       next[idx] = { ...next[idx], price: targetPrice };
@@ -2111,7 +2142,7 @@ export default function PricingHPPPage() {
                             <button
                               type="button"
                               onClick={() => {
-                                const targetPrice = Math.round((unitCost * 1.05) / 100) * 100;
+                                const targetPrice = roundToKelipatan(unitCost * 1.05, editRoundingStep);
                                 if (isBase) setEditPriceEcer(targetPrice);
                                 setEditUnits(prev => {
                                   const next = [...prev];
@@ -2120,14 +2151,14 @@ export default function PricingHPPPage() {
                                 });
                               }}
                               className="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-[9px] font-black transition-colors"
-                              title="Terapkan margin 5%"
+                              title={`Terapkan margin 5% (Bulat Rp ${editRoundingStep})`}
                             >
                               5%
                             </button>
                             <button
                               type="button"
                               onClick={() => {
-                                const targetPrice = Math.round((unitCost * 1.10) / 100) * 100;
+                                const targetPrice = roundToKelipatan(unitCost * 1.10, editRoundingStep);
                                 if (isBase) setEditPriceEcer(targetPrice);
                                 setEditUnits(prev => {
                                   const next = [...prev];
@@ -2136,14 +2167,14 @@ export default function PricingHPPPage() {
                                 });
                               }}
                               className="px-1.5 py-0.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded text-[9px] font-black transition-colors"
-                              title="Terapkan margin 10%"
+                              title={`Terapkan margin 10% (Bulat Rp ${editRoundingStep})`}
                             >
                               10%
                             </button>
                             <button
                               type="button"
                               onClick={() => {
-                                const targetPrice = Math.ceil((unitCost / 0.85) / 100) * 100;
+                                const targetPrice = roundToKelipatan(unitCost / 0.85, editRoundingStep);
                                 if (isBase) setEditPriceEcer(targetPrice);
                                 setEditUnits(prev => {
                                   const next = [...prev];
@@ -2152,14 +2183,14 @@ export default function PricingHPPPage() {
                                 });
                               }}
                               className="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-[9px] font-black transition-colors"
-                              title="Terapkan margin 15%"
+                              title={`Terapkan margin 15% (Bulat Rp ${editRoundingStep})`}
                             >
                               15%
                             </button>
                             <button
                               type="button"
                               onClick={() => {
-                                const targetPrice = Math.ceil((unitCost / 0.8) / 100) * 100;
+                                const targetPrice = roundToKelipatan(unitCost / 0.8, editRoundingStep);
                                 if (isBase) setEditPriceEcer(targetPrice);
                                 setEditUnits(prev => {
                                   const next = [...prev];
@@ -2168,13 +2199,13 @@ export default function PricingHPPPage() {
                                 });
                               }}
                               className="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-[9px] font-black transition-colors"
-                              title="Terapkan margin 20%"
+                              title={`Terapkan margin 20% (Bulat Rp ${editRoundingStep})`}
                             >
                               20%
                             </button>
 
                             {/* Input Presentase Manual per Satuan */}
-                            <div className="flex items-center gap-1 bg-slate-100 border border-slate-300 rounded-lg px-1.5 py-0.5" title="Ketik persentase (%) keuntungan manual">
+                            <div className="flex items-center gap-1 bg-slate-100 border border-slate-300 rounded-lg px-1.5 py-0.5" title={`Ketik persentase (%) keuntungan manual (Bulat Rp ${editRoundingStep}), lalu tekan Enter`}>
                               <span className="text-[9px] font-black text-slate-500">%</span>
                               <input
                                 type="number"
@@ -2189,24 +2220,24 @@ export default function PricingHPPPage() {
                                     const val = Number((e.target as HTMLInputElement).value);
                                     if (!isNaN(val) && val > -100 && val < 100) {
                                       // Rumus Margin %: Harga = Modal / (1 - (val / 100))
-                                      const targetPrice = Math.ceil((unitCost / (1 - (val / 100))) / 100) * 100;
+                                      const targetPrice = roundToKelipatan(unitCost / (1 - (val / 100)), editRoundingStep);
                                       if (isBase) setEditPriceEcer(targetPrice);
                                       setEditUnits(prev => {
                                         const next = [...prev];
                                         next[idx] = { ...next[idx], price: targetPrice };
                                         return next;
                                       });
-                                      notify.success(`Margin ${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')}`);
+                                      notify.success(`Margin ${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')} (Bulat Rp ${editRoundingStep})`);
                                     } else if (val >= 100) {
                                       // Markup % jika >= 100: Harga = Modal * (1 + val/100)
-                                      const targetPrice = Math.ceil((unitCost * (1 + (val / 100))) / 100) * 100;
+                                      const targetPrice = roundToKelipatan(unitCost * (1 + (val / 100)), editRoundingStep);
                                       if (isBase) setEditPriceEcer(targetPrice);
                                       setEditUnits(prev => {
                                         const next = [...prev];
                                         next[idx] = { ...next[idx], price: targetPrice };
                                         return next;
                                       });
-                                      notify.success(`Markup +${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')}`);
+                                      notify.success(`Markup +${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')} (Bulat Rp ${editRoundingStep})`);
                                     }
                                   }
                                 }}
@@ -2214,7 +2245,7 @@ export default function PricingHPPPage() {
                                   const val = Number(e.target.value);
                                   if (e.target.value !== '' && !isNaN(val)) {
                                     if (val > -100 && val < 100) {
-                                      const targetPrice = Math.ceil((unitCost / (1 - (val / 100))) / 100) * 100;
+                                      const targetPrice = roundToKelipatan(unitCost / (1 - (val / 100)), editRoundingStep);
                                       if (isBase) setEditPriceEcer(targetPrice);
                                       setEditUnits(prev => {
                                         const next = [...prev];
@@ -2223,7 +2254,7 @@ export default function PricingHPPPage() {
                                       });
                                       notify.success(`Margin ${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')}`);
                                     } else if (val >= 100) {
-                                      const targetPrice = Math.ceil((unitCost * (1 + (val / 100))) / 100) * 100;
+                                      const targetPrice = roundToKelipatan(unitCost * (1 + (val / 100)), editRoundingStep);
                                       if (isBase) setEditPriceEcer(targetPrice);
                                       setEditUnits(prev => {
                                         const next = [...prev];
@@ -2235,6 +2266,50 @@ export default function PricingHPPPage() {
                                   }
                                 }}
                                 className="w-10 bg-transparent text-[10px] font-black text-slate-800 text-center focus:outline-none"
+                              />
+                            </div>
+
+                            {/* Input Nominal Profit Manual (+Rp) per Satuan */}
+                            <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-300 rounded-lg px-1.5 py-0.5" title={`Ketik nominal keuntungan bersih (Rp) yang diinginkan (Bulat Rp ${editRoundingStep}), lalu tekan Enter`}>
+                              <span className="text-[9px] font-black text-emerald-700">+Rp</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step={editRoundingStep}
+                                placeholder="Untung"
+                                defaultValue=""
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const profit = Number((e.target as HTMLInputElement).value);
+                                    if (!isNaN(profit) && profit >= 0) {
+                                      const raw = unitCost + profit;
+                                      const targetPrice = roundToKelipatan(raw, editRoundingStep);
+                                      if (isBase) setEditPriceEcer(targetPrice);
+                                      setEditUnits(prev => {
+                                        const next = [...prev];
+                                        next[idx] = { ...next[idx], price: targetPrice };
+                                        return next;
+                                      });
+                                      notify.success(`Untung +Rp ${profit.toLocaleString('id-ID')} diterapkan: Rp ${targetPrice.toLocaleString('id-ID')} (Bulat Rp ${editRoundingStep})`);
+                                    }
+                                  }
+                                }}
+                                onBlur={e => {
+                                  const profit = Number(e.target.value);
+                                  if (e.target.value !== '' && !isNaN(profit) && profit >= 0) {
+                                    const raw = unitCost + profit;
+                                    const targetPrice = roundToKelipatan(raw, editRoundingStep);
+                                    if (isBase) setEditPriceEcer(targetPrice);
+                                    setEditUnits(prev => {
+                                      const next = [...prev];
+                                      next[idx] = { ...next[idx], price: targetPrice };
+                                      return next;
+                                    });
+                                    notify.success(`Untung +Rp ${profit.toLocaleString('id-ID')} diterapkan: Rp ${targetPrice.toLocaleString('id-ID')}`);
+                                  }
+                                }}
+                                className="w-14 bg-transparent text-[10px] font-black text-emerald-900 text-center focus:outline-none placeholder:text-emerald-400"
                               />
                             </div>
                           </div>
@@ -2262,6 +2337,7 @@ export default function PricingHPPPage() {
                     const tiers = calculateCustomerTierPrices({
                       costPrice: editModalCost,
                       priceEcer: editPriceEcer,
+                      roundingStep: editRoundingStep,
                     });
                     setEditPriceSemiGrosir(tiers.priceSemiGrosir);
                     setEditPriceGrosir(tiers.priceGrosir);
