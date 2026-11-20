@@ -142,6 +142,8 @@ export default function PricingHPPPage() {
   const [showDivideModal, setShowDivideModal] = useState(false);
   const [showSyncAvgModal, setShowSyncAvgModal] = useState(false);
   const [showResetStockModal, setShowResetStockModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [newProductFilter, setNewProductFilter] = useState<'ALL' | 'NEW' | 'HAS_PO' | 'NO_PO'>('ALL');
   const [showWholesaleModal, setShowWholesaleModal] = useState(false);
   const [wholesaleMode, setWholesaleMode] = useState<'DISCOUNT_PERCENT' | 'DISCOUNT_NOMINAL' | 'MARGIN_COST' | 'FIXED_PRICE'>('DISCOUNT_PERCENT');
@@ -532,8 +534,18 @@ export default function PricingHPPPage() {
       });
   }, [products, search, selectedCategory, statusFilter, marginFilter, taxFilter, variantFilter, sortBy, avgHppMap, priceReviewByProduct, newProductFilter]);
 
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
+  const paginatedProducts = useMemo(
+    () => filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filteredProducts, currentPage, pageSize]
+  );
+
   // Multi-select helpers
   const allFilteredIds = useMemo(() => filteredProducts.map(p => p.id), [filteredProducts]);
+
+  // Reset to page 1 on filter/search change
+  useEffect(() => { setCurrentPage(1); }, [search, selectedCategory, statusFilter, marginFilter, taxFilter, variantFilter, newProductFilter, sortBy]);
   const allSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id));
   const someSelected = allFilteredIds.some(id => selectedIds.has(id));
 
@@ -1431,7 +1443,7 @@ export default function PricingHPPPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
-                      {filteredProducts.map(p => {
+                      {paginatedProducts.map(p => {
                         const isHealthy = p.marginPct >= 20;
                         const isSlim = p.marginPct >= 8 && p.marginPct < 20;
                         const isLoss = p.marginPct <= 0;
@@ -1771,9 +1783,62 @@ export default function PricingHPPPage() {
 
                 {/* TABLE FOOTER */}
                 <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                  <p className="text-xs font-bold text-slate-400">
-                    Menampilkan <span className="text-slate-700">{filteredProducts.length}</span> dari <span className="text-slate-700">{products.length}</span> produk {statusFilter === 'ACTIVE' ? 'aktif' : statusFilter === 'ARCHIVED' ? 'nonaktif / arsip' : ''}
-                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <p className="text-xs font-bold text-slate-400">
+                      Menampilkan <span className="text-slate-700">{paginatedProducts.length}</span> dari <span className="text-slate-700">{filteredProducts.length}</span> produk {statusFilter === 'ACTIVE' ? 'aktif' : statusFilter === 'ARCHIVED' ? 'nonaktif / arsip' : ''} · hal. {currentPage}/{totalPages}
+                    </p>
+                    <select
+                      value={pageSize}
+                      onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                      className="text-[11px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg px-2 py-1 outline-none"
+                    >
+                      <option value={10}>10/hal</option>
+                      <option value={25}>25/hal</option>
+                      <option value={50}>50/hal</option>
+                      <option value={100}>100/hal</option>
+                    </select>
+                  </div>
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="px-2 py-1 rounded-lg text-[11px] font-black bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Halaman pertama"
+                      >«</button>
+                      <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-2 py-1 rounded-lg text-[11px] font-black bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >‹ Prev</button>
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let page: number;
+                        if (totalPages <= 5) page = i + 1;
+                        else if (currentPage <= 3) page = i + 1;
+                        else if (currentPage >= totalPages - 2) page = totalPages - 4 + i;
+                        else page = currentPage - 2 + i;
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-7 h-7 rounded-lg text-[11px] font-black border transition-colors ${currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                          >{page}</button>
+                        );
+                      })}
+                      <button
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-2 py-1 rounded-lg text-[11px] font-black bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >Next ›</button>
+                      <button
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        className="px-2 py-1 rounded-lg text-[11px] font-black bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Halaman terakhir"
+                      >»</button>
+                    </div>
+                  )}
                   {selectedCount > 0 && (
                     <div className="flex items-center gap-2">
                       <button
