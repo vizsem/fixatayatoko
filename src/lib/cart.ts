@@ -64,13 +64,30 @@ export const getItemPrice = (item: CartItem): number => {
   const grosirPrice = Number(item.wholesalePrice ?? item.Grosir ?? 0);
   const minGrosirQty = Number(item.minWholesale ?? item.Min_Grosir ?? (item as any).minWholesaleQty ?? 0);
 
-  const baseUnitPrice = grosirPrice > 0 && minGrosirQty > 1 && baseQty >= minGrosirQty ? grosirPrice : baseEcer;
+  // Periksa apakah produk memiliki satuan di atasnya (misal: RENCENG, DUS, PACK dengan contains > 1)
+  const rawUnits = Array.isArray((item as any).units) ? (item as any).units : [];
+  const higherUnits = rawUnits
+    .filter((u: any) => Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
+    .sort((a: any, b: any) => Number(b.contains) - Number(a.contains)); // Urutkan dari contains terbesar
+
+  // Cek apakah baseQty sudah menembus kuantiti satuan di atasnya
+  const reachedUnit = higherUnits.find((u: any) => baseQty >= Number(u.contains));
+
+  let baseUnitPrice = baseEcer;
+  if (reachedUnit) {
+    // Kuantitas PCS menembus satuan di atasnya:
+    // HILANGKAN harga grosir PCS, otomatis masuk ke tarif harga satuan di atasnya!
+    baseUnitPrice = Number(reachedUnit.price) / Number(reachedUnit.contains);
+  } else if (grosirPrice > 0 && minGrosirQty > 1 && baseQty >= minGrosirQty) {
+    baseUnitPrice = grosirPrice;
+  }
+
   const unitPrice = item.unitPrice != null ? Number(item.unitPrice) : baseUnitPrice * contains;
   return unitPrice;
 };
 
-// 💡 FITUR BARU: Analisis Psikologis Grosir
-// Menghitung berapa lagi item yang harus dibeli untuk mendapat harga grosir
+// 💡 FITUR BARU: Analisis Psikologis Grosir & Multi-Satuan
+// Menghitung berapa lagi item yang harus dibeli untuk mendapat harga grosir / satuan di atasnya
 export const getWholesaleUpsellInfo = (item: CartItem): {
   isEligible: boolean;
   qtyNeeded: number;
@@ -84,8 +101,33 @@ export const getWholesaleUpsellInfo = (item: CartItem): {
   const grosirPrice = Number(item.wholesalePrice ?? item.Grosir ?? 0);
   const minGrosirQty = Number(item.minWholesale ?? item.Min_Grosir ?? (item as any).minWholesaleQty ?? 0);
 
+  // Cek apakah ada satuan di atasnya (misal RENCENG, DUS)
+  const rawUnits = Array.isArray((item as any).units) ? (item as any).units : [];
+  const higherUnits = rawUnits
+    .filter((u: any) => Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
+    .sort((a: any, b: any) => Number(b.contains) - Number(a.contains));
+  const reachedUnit = higherUnits.find((u: any) => baseQty >= Number(u.contains));
+
+  if (reachedUnit) {
+    const higherRate = Number(reachedUnit.price) / Number(reachedUnit.contains);
+    const totalSavings = Math.max(0, (baseEcer - higherRate) * baseQty);
+    return {
+      isEligible: true,
+      qtyNeeded: 0,
+      potentialSavings: totalSavings,
+      message: `🎉 Otomatis Masuk Tarif Satuan ${reachedUnit.code}! Anda hemat Rp${Math.round(totalSavings).toLocaleString('id-ID')}`
+    };
+  }
+
   // Jika produk tidak punya setting grosir yang valid, lewati
   if (grosirPrice <= 0 || minGrosirQty <= 1) return null;
+
+  // Jika ada satuan di atasnya dan target minGrosirQty >= satuan di atasnya,
+  // maka harga grosir PCS ditiadakan agar pembeli diarahkan ke satuan di atasnya
+  const minHigherUnit = higherUnits.slice().sort((a: any, b: any) => Number(a.contains) - Number(b.contains))[0];
+  if (minHigherUnit && minGrosirQty >= Number(minHigherUnit.contains)) {
+    return null;
+  }
 
   // Jika sudah mencapai grosir
   if (baseQty >= minGrosirQty) {
@@ -102,7 +144,6 @@ export const getWholesaleUpsellInfo = (item: CartItem): {
   const qtyNeeded = minGrosirQty - baseQty;
   
   // Tampilkan pesan upsell jika pembeli sudah memasukkan minimal separuh dari target grosir
-  // (misal target 10, dia beli 5. Kita push agar dia nambah 5 lagi)
   if (baseQty >= (minGrosirQty / 2)) {
     const savingsPerItem = baseEcer - grosirPrice;
     const totalPotentialSavings = savingsPerItem * minGrosirQty;

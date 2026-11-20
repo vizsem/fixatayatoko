@@ -861,6 +861,18 @@ export default function PricingHPPPage() {
       const newGrosir = Number(editPriceGrosir || 0);
       const newMinGrosir = Number(editMinGrosir || 1);
 
+      // Validasi Anti-Rugi: Harga Grosir & Semi-Grosir TIDAK BOLEH sama dengan atau di bawah modal
+      if (newCost > 0 && newGrosir > 0 && newGrosir <= newCost) {
+        notify.error(`Harga Grosir (Rp${newGrosir.toLocaleString('id-ID')}) tidak boleh sama dengan atau lebih rendah dari Modal (Rp${newCost.toLocaleString('id-ID')})!`);
+        setSavingEdit(false);
+        return;
+      }
+      if (newCost > 0 && newSemiGrosir > 0 && newSemiGrosir <= newCost) {
+        notify.error(`Harga Semi-Grosir (Rp${newSemiGrosir.toLocaleString('id-ID')}) tidak boleh sama dengan atau lebih rendah dari Modal (Rp${newCost.toLocaleString('id-ID')})!`);
+        setSavingEdit(false);
+        return;
+      }
+
       // Sinkronisasi base unit di editUnits dengan newPrice
       const syncedUnits = editUnits.map(u => {
         if (u.code === editingProduct.unit) {

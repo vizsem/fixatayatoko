@@ -154,15 +154,31 @@ function LabelCardItem({
             </div>
           )}
 
-          {/* Info Grosir */}
-          {showWholesale && (item.wholesalePrice || 0) > 0 && (
-            <div className={`flex items-center justify-between font-bold border border-black rounded-[2px] mt-0.5 leading-none shrink-0 text-black ${isSheet ? 'text-[7.5px] px-2 py-0.5' : isLarge ? 'text-[6.5px] px-1.5 py-0.5' : 'text-[5.5px] px-1 py-0.5'}`}>
-              <span className="uppercase text-black font-bold">Grosir:</span>
-              <span className="font-bold text-black">
-                &ge;{item.minWholesale || 2} @{formatRp(item.wholesalePrice || 0)}
-              </span>
-            </div>
-          )}
+          {/* Info Semi Grosir (Bukan Grosir, dan otomatis dihilangkan jika kuantiti PCS menembus satuan di atasnya) */}
+          {showWholesale && (() => {
+            const rawUnits = Array.isArray(item.units) ? item.units : [];
+            const higherUnits = rawUnits
+              .filter((u: any) => Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
+              .sort((a: any, b: any) => Number(a.contains) - Number(b.contains));
+            const minHigherContains = higherUnits.length > 0 ? Number(higherUnits[0].contains) : 0;
+
+            const semiPrice = Number(item.priceSemiGrosir || item.wholesalePrice || 0);
+            const minQty = Number(item.minSemiGrosir || item.minWholesale || 2);
+
+            // Hilangkan jika tidak ada harga
+            if (semiPrice <= 0) return null;
+            // Hilangkan jika kuantiti menembus satuan di atasnya (otomatis diarahkan ke harga satuan di atasnya)
+            if (minHigherContains > 1 && minQty >= minHigherContains) return null;
+
+            return (
+              <div className={`flex items-center justify-between font-bold border border-black rounded-[2px] mt-0.5 leading-none shrink-0 text-black ${isSheet ? 'text-[7.5px] px-2 py-0.5' : isLarge ? 'text-[6.5px] px-1.5 py-0.5' : 'text-[5.5px] px-1 py-0.5'}`}>
+                <span className="uppercase text-black font-bold">Semi Grosir:</span>
+                <span className="font-bold text-black">
+                  &ge;{minQty} @{formatRp(semiPrice)}
+                </span>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Kanan: QR Code */}
@@ -525,7 +541,7 @@ function BulkPrintContent() {
                 onChange={(e) => setShowWholesale(e.target.checked)}
                 className="rounded text-blue-600"
               />
-              Info Grosir
+              Info Semi Grosir
             </label>
             <label className="flex items-center gap-1.5 cursor-pointer" title="Gabungkan daftar harga satuan lain (DUS, RENCENG, PACK) langsung di dalam 1 label stiker rak yang sama">
               <input

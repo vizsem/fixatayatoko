@@ -48,8 +48,9 @@ export function calculateCustomerTierPrices({
   const ecer = Math.max(0, priceEcer || 0);
 
   // Batas bawah keselamatan (Anti-Boncos)
-  const minSemiGrosirSafe = modal > 0 ? roundToStep(modal * 1.05, roundingStep) : 0;
-  const minGrosirSafe = modal > 0 ? roundToStep(modal * 1.03, roundingStep) : 0;
+  // Harga Grosir dan Semi-Grosir TIDAK BOLEH SAMA DENGAN ATAU DI BAWAH MODAL (HPP)
+  const minSemiGrosirSafe = modal > 0 ? Math.max(roundToStep(modal * 1.07, roundingStep), modal + roundingStep) : 0;
+  const minGrosirSafe = modal > 0 ? Math.max(roundToStep(modal * 1.04, roundingStep), modal + roundingStep) : 0;
 
   // 1. Semi-Grosir
   let semiGrosir = Number(customSemiGrosir || 0);
@@ -57,6 +58,9 @@ export function calculateCustomerTierPrices({
     // Default: diskon 7% dari Ecer
     const calculated = roundToStep(ecer * 0.93, roundingStep);
     semiGrosir = Math.max(calculated, minSemiGrosirSafe);
+  } else if (modal > 0 && semiGrosir <= modal) {
+    // Cegah harga semi grosir sama dengan atau di bawah modal
+    semiGrosir = minSemiGrosirSafe;
   }
 
   // 2. Grosir
@@ -65,9 +69,16 @@ export function calculateCustomerTierPrices({
     // Default: diskon 14% dari Ecer
     const calculated = roundToStep(ecer * 0.86, roundingStep);
     grosir = Math.max(calculated, minGrosirSafe);
+  } else if (modal > 0 && grosir <= modal) {
+    // Cegah harga grosir sama dengan atau di bawah modal
+    grosir = minGrosirSafe;
   }
 
-  // Pastikan hirarki harga logis: Modal <= Grosir <= Semi-Grosir <= Ecer
+  // Pastikan hirarki harga logis: Modal < Grosir <= Semi-Grosir <= Ecer
+  if (modal > 0) {
+    if (grosir <= modal) grosir = minGrosirSafe;
+    if (semiGrosir <= modal) semiGrosir = minSemiGrosirSafe;
+  }
   if (ecer > 0) {
     if (grosir > ecer) grosir = ecer;
     if (semiGrosir > ecer) semiGrosir = ecer;

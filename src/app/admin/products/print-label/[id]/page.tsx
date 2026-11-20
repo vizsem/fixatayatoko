@@ -156,15 +156,30 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
                 </div>
               )}
 
-              {/* Harga Grosir (Jika ada - Selalu Terlihat Tanpa Terpotong & Tanpa Dither Gray) */}
-              {(product.wholesalePrice || product.Grosir || product.raw_data?.Grosir) > 0 && (
-                <div className="flex items-center justify-between text-[5.5px] font-bold border border-black px-1 py-0.5 rounded-[2px] mt-0.5 leading-none shrink-0 text-black">
-                  <span className="uppercase text-black font-bold">Grosir:</span>
-                  <span className="font-bold text-black">
-                    &ge;{product.minWholesale || product.Min_Grosir || product.raw_data?.Min_Grosir || 2} @{formatRp(product.wholesalePrice || product.Grosir || product.raw_data?.Grosir)}
-                  </span>
-                </div>
-              )}
+              {/* Harga Semi Grosir (Bukan Grosir, dan otomatis dihilangkan jika kuantiti PCS menembus satuan di atasnya) */}
+              {(() => {
+                const raw = product.raw_data || {};
+                const rawUnits = Array.isArray(product.units) ? product.units : (Array.isArray(raw.units) ? raw.units : []);
+                const higherUnits = rawUnits
+                  .filter((u: any) => Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
+                  .sort((a: any, b: any) => Number(a.contains) - Number(b.contains));
+                const minHigherContains = higherUnits.length > 0 ? Number(higherUnits[0].contains) : 0;
+
+                const semiPrice = Number(product.priceSemiGrosir || raw.priceSemiGrosir || product.wholesalePrice || raw.wholesalePrice || product.Grosir || raw.Grosir || 0);
+                const minQty = Number(product.minSemiGrosir || raw.minSemiGrosir || product.minWholesale || product.Min_Grosir || raw.Min_Grosir || 2);
+
+                if (semiPrice <= 0) return null;
+                if (minHigherContains > 1 && minQty >= minHigherContains) return null;
+
+                return (
+                  <div className="flex items-center justify-between text-[5.5px] font-bold border border-black px-1 py-0.5 rounded-[2px] mt-0.5 leading-none shrink-0 text-black">
+                    <span className="uppercase text-black font-bold">Semi Grosir:</span>
+                    <span className="font-bold text-black">
+                      &ge;{minQty} @{formatRp(semiPrice)}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Kanan: QR Code di Tengah Samping (Menggunakan SKU Toko) */}

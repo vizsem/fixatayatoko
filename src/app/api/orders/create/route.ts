@@ -137,7 +137,19 @@ export async function POST(req: Request) {
         if (channelConfig?.price != null) baseUnitPrice = Number(channelConfig.price);
       }
 
-      if (wholesalePrice > 0 && baseQuantity >= minWholesale) baseUnitPrice = wholesalePrice;
+      // Cek apakah ada satuan di atasnya (misal RENCENG, DUS)
+      const rawUnits = Array.isArray(productData.units) ? productData.units : [];
+      const higherUnits = rawUnits
+        .filter((u: any) => Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
+        .sort((a: any, b: any) => Number(b.contains) - Number(a.contains));
+      const reachedHigher = higherUnits.find((u: any) => baseQuantity >= Number(u.contains));
+
+      if (reachedHigher) {
+        // Kuantitas PCS menembus satuan di atasnya: otomatis masuk ke tarif satuan di atasnya
+        baseUnitPrice = Number(reachedHigher.price) / Number(reachedHigher.contains);
+      } else if (wholesalePrice > 0 && baseQuantity >= minWholesale) {
+        baseUnitPrice = wholesalePrice;
+      }
 
       // CATATAN PENTING: diskon "TEBUS_MURAH" senilai Rp10.000 DIHAPUS.
       //

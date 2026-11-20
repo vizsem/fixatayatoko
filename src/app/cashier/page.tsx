@@ -418,7 +418,18 @@ export default function CashierPOS() {
           toast.error(`Stok tidak cukup! Sisa: ${product.stock}`);
           return prev;
         }
-        return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: i.quantity + 1 } : i);
+        const nextQty = exist.quantity + 1;
+        let newPrice = exist.price;
+        if (product.units && product.units.length > 0) {
+          const higherUnits = product.units
+            .filter(u => u.code !== (product.unit || 'PCS') && Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
+            .sort((a, b) => Number(b.contains) - Number(a.contains));
+          const reachedHigher = higherUnits.find(u => nextQty >= Number(u.contains));
+          if (reachedHigher) {
+            newPrice = Number(reachedHigher.price) / Number(reachedHigher.contains);
+          }
+        }
+        return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: nextQty, price: newPrice } : i);
       }
 
       return [...prev, { 
@@ -595,9 +606,35 @@ export default function CashierPOS() {
         return prev; // Do not update
       }
 
-      return prev.map(i => i.id === id ? { ...i, quantity: q } : i);
+      // Cek apakah item ini adalah satuan dasar (PCS) dan kuantiti menembus satuan di atasnya
+      const isBaseUnit = (item.contains || 1) === 1;
+      let effectivePrice = item.price;
+
+      if (isBaseUnit && product.units && product.units.length > 0) {
+        const higherUnits = product.units
+          .filter(u => u.code !== (product.unit || 'PCS') && Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
+          .sort((a, b) => Number(b.contains) - Number(a.contains));
+        
+        const reachedHigher = higherUnits.find(u => q >= Number(u.contains));
+        if (reachedHigher) {
+          // Otomatis terapkan tarif satuan di atasnya per PCS
+          effectivePrice = Number(reachedHigher.price) / Number(reachedHigher.contains);
+        } else {
+          // Kembali ke harga eceran semula (atau tier pelanggan)
+          const tierResult = resolveCustomerUnitPrice({
+            baseEcer: product.price,
+            priceSemiGrosir: product.priceSemiGrosir,
+            priceGrosir: product.priceGrosir,
+            customerType: selectedCustomer?.customerType,
+            contains: 1,
+          });
+          effectivePrice = tierResult.effectivePrice;
+        }
+      }
+
+      return prev.map(i => i.id === id ? { ...i, quantity: q, price: effectivePrice } : i);
     });
-  }, [products]);
+  }, [products, selectedCustomer]);
 
   const updatePrice = useCallback((id: string, newTotal: number, quantity: number) => {
     setCart(prev => prev.map(i => i.id === id ? { ...i, price: newTotal / quantity } : i));

@@ -3665,6 +3665,9 @@ export interface BulkPrintProductItem {
   price: number;
   wholesalePrice?: number;
   minWholesale?: number;
+  priceSemiGrosir?: number;
+  minSemiGrosir?: number;
+  costPrice?: number;
   unit: string;
   sku: string;
   barcode: string;
@@ -3743,8 +3746,15 @@ export async function getProductsForBulkPrintAction(
 
       const baseUnit = String(p.unit || raw.Satuan || raw.unit || 'PCS').toUpperCase();
       const basePrice = Number(p.price ?? raw.Ecer ?? raw.price ?? 0);
+      const costPrice = Number(p.cost_price ?? raw.Modal ?? raw.purchasePrice ?? raw.costPrice ?? 0);
       const wPrice = Number(raw.Grosir ?? raw.wholesalePrice ?? 0);
       const minW = Number(raw.Min_Grosir ?? raw.minWholesaleQty ?? 0);
+
+      // Semi-Grosir: pastikan tidak sama atau di bawah modal
+      const rawSemi = Number(raw.priceSemiGrosir ?? raw.wholesaleSemiPrice ?? raw.Harga_Semi_Grosir ?? 0);
+      const safeSemi = rawSemi > 0 ? (costPrice > 0 && rawSemi <= costPrice ? Math.round(costPrice * 1.07) : rawSemi) : 0;
+      const minSemi = Number(raw.minSemiGrosir ?? raw.Min_Semi_Grosir ?? minW ?? 2);
+
       const category = String(p.category || raw.Kategori || raw.category || 'UMUM');
       const sku = String(p.sku || raw.ID || raw.sku || p.id.slice(0, 8));
       
@@ -3769,6 +3779,9 @@ export async function getProductsForBulkPrintAction(
           price: basePrice,
           wholesalePrice: wPrice,
           minWholesale: minW,
+          priceSemiGrosir: safeSemi,
+          minSemiGrosir: minSemi,
+          costPrice,
           unit: baseUnit,
           sku,
           barcode,
@@ -3784,8 +3797,14 @@ export async function getProductsForBulkPrintAction(
           const cRaw = child.raw_data || {};
           const cUnit = String(child.unit || cRaw.Satuan || cRaw.unit || baseUnit).toUpperCase();
           const cPrice = Number(child.price ?? cRaw.Ecer ?? cRaw.price ?? basePrice);
+          const cCost = Number(child.cost_price ?? cRaw.Modal ?? cRaw.purchasePrice ?? costPrice);
           const cWPrice = Number(cRaw.Grosir ?? cRaw.wholesalePrice ?? wPrice);
           const cMinW = Number(cRaw.Min_Grosir ?? cRaw.minWholesaleQty ?? minW);
+
+          const cRawSemi = Number(cRaw.priceSemiGrosir ?? cRaw.wholesaleSemiPrice ?? cRaw.Harga_Semi_Grosir ?? safeSemi);
+          const cSafeSemi = cRawSemi > 0 ? (cCost > 0 && cRawSemi <= cCost ? Math.round(cCost * 1.07) : cRawSemi) : 0;
+          const cMinSemi = Number(cRaw.minSemiGrosir ?? cRaw.Min_Semi_Grosir ?? cMinW ?? minSemi);
+
           const cSku = String(child.sku || cRaw.ID || cRaw.sku || child.id.slice(0, 8));
           
           // Ambil barcode khusus satuan PCS untuk varian anak
@@ -3813,6 +3832,9 @@ export async function getProductsForBulkPrintAction(
             price: cPrice,
             wholesalePrice: cWPrice,
             minWholesale: cMinW,
+            priceSemiGrosir: cSafeSemi,
+            minSemiGrosir: cMinSemi,
+            costPrice: cCost,
             unit: cUnit,
             sku: cSku,
             barcode: cBarcode,
