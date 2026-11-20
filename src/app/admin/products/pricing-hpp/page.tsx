@@ -34,6 +34,9 @@ import {
   applyPriceRecommendations,
   bulkUpdateWholesalePrice,
   type BulkWholesaleOptions,
+  bulkSetPriceTiers,
+  type BulkPriceTiersOptions,
+  type PriceTierRule,
 } from '@/lib/actions/product.actions';
 
 export interface ProductUnitItem {
@@ -77,6 +80,7 @@ interface ProductItem {
   isVariant: boolean;
   isParent: boolean;
   updatedAt?: string;
+  priceTiers?: Array<{ minQty: number; price: number; label?: string }>;
 }
 
 interface AvgHppInfo {
@@ -150,6 +154,14 @@ export default function PricingHPPPage() {
   const [wholesaleValue, setWholesaleValue] = useState<number>(5);
   const [wholesaleMinQty, setWholesaleMinQty] = useState<number>(3);
   const [wholesaleAllUnits, setWholesaleAllUnits] = useState(false);
+  const [showTierModal, setShowTierModal] = useState(false);
+  const [tierMode, setTierMode] = useState<'DISCOUNT_FROM_RETAIL' | 'MARGIN_FROM_COST'>('DISCOUNT_FROM_RETAIL');
+  const [tierRules, setTierRules] = useState<Array<{ minQty: number; value: number; label: string }>>([
+    { minQty: 1, value: 0, label: 'Ecer' },
+    { minQty: 3, value: 5, label: 'Grosir 1' },
+    { minQty: 12, value: 10, label: 'Grosir 2' },
+  ]);
+  const [tierRoundingStep, setTierRoundingStep] = useState<number>(100);
   const [divideValue, setDivideValue] = useState<number>(1);
   const [isResetting, startResetTransition] = useTransition();
 
@@ -351,6 +363,7 @@ export default function PricingHPPPage() {
           isVariant: Boolean((p.parent_id || raw.Parent_ID || raw.parentId || '').toString().trim()),
           isParent: parentIdsSet.has(p.id),
           updatedAt: p.updated_at || raw.updatedAt || raw.customHppUpdatedAt || '',
+          priceTiers: Array.isArray(raw.priceTiers) ? raw.priceTiers : undefined,
         };
       });
 
@@ -822,6 +835,34 @@ export default function PricingHPPPage() {
       } catch (err: any) {
         setShowWholesaleModal(false);
         notify.error(err.message || 'Gagal update grosir');
+      }
+    });
+  };
+
+  const handleBulkSetPriceTiers = () => {
+    if (selectedIds.size === 0) { notify.error('Pilih minimal 1 produk'); return; }
+    if (tierRules.length < 2) { notify.error('Minimal harus ada 2 tingkatan harga (Ecer + Grosir)'); return; }
+    startResetTransition(async () => {
+      try {
+        const userRes = await supabase.auth.getUser();
+        const adminEmail = userRes.data.user?.email || 'admin';
+        const result = await bulkSetPriceTiers(
+          Array.from(selectedIds),
+          {
+            mode: tierMode,
+            tiers: tierRules,
+            roundingStep: tierRoundingStep,
+          },
+          adminEmail,
+        );
+        setShowTierModal(false);
+        if (!result.success) throw new Error(result.error);
+        notify.success(`✅ Berhasil menghitung & menerapkan tier harga untuk ${result.updated} produk`);
+        setSelectedIds(new Set());
+        await fetchData();
+      } catch (err: any) {
+        setShowTierModal(false);
+        notify.error(err.message || 'Gagal update tier grosir');
       }
     });
   };
@@ -1390,6 +1431,15 @@ export default function PricingHPPPage() {
                     <Tag size={12} />
                     Set Grosir
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowTierModal(true)}
+                    className="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border border-purple-500/50 shadow-sm"
+                    title="Hitung & atur tingkatan (tier) harga grosir bertingkat otomatis untuk produk yang dipilih"
+                  >
+                    <Layers size={12} />
+                    Tier Grosir
+                  </button>
                 </div>
               </div>
             )}
@@ -1744,7 +1794,16 @@ export default function PricingHPPPage() {
 
                             {/* Harga Grosir */}
                             <td className="py-2 px-4 text-right">
-                              {p.priceGrosir > 0 ? (
+                              {p.priceTiers && p.priceTiers.length > 1 ? (
+                                <div className="flex flex-col items-end gap-0.5" title={p.priceTiers.map(t => `${t.label || `Min ${t.minQty}`}: Rp${t.price.toLocaleString('id-ID')}`).join('\n')}>
+                                  {p.priceTiers.filter(t => t.minQty > 1).map((t, idx) => (
+                                    <span key={idx} className="inline-flex items-center gap-1 text-[9px] font-black text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                      <span className="text-purple-400">≥{t.minQty}</span>
+                                      <span>Rp{t.price.toLocaleString('id-ID')}</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : p.priceGrosir > 0 ? (
                                 <div>
                                   <p className="font-black text-purple-700">Rp {p.priceGrosir.toLocaleString('id-ID')}</p>
                                   <p className="text-[10px] text-slate-400 font-bold">Min: {p.minGrosir} {p.unit}</p>
@@ -2873,6 +2932,235 @@ export default function PricingHPPPage() {
               </button>
               <button onClick={handleBulkWholesale} disabled={isResetting} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                 {isResetting ? '⏳ Menyimpan...' : 'Terapkan Grosir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTierModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4" onClick={() => setShowTierModal(false)}>
+          <div className="bg-white rounded-3xl p-6 max-w-lg w-full shadow-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+                  <Layers size={18} className="text-purple-600" />
+                  Hitung Tier Harga Grosir Otomatis
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Terapkan harga bertingkat otomatis untuk <strong className="text-purple-600">{selectedIds.size} produk</strong> terpilih
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTierModal(false)}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Mode Pemilihan */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1.5">Metode Perhitungan Tier</label>
+                <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setTierMode('DISCOUNT_FROM_RETAIL')}
+                    className={`py-2 px-3 rounded-xl text-xs font-black transition-all ${
+                      tierMode === 'DISCOUNT_FROM_RETAIL'
+                        ? 'bg-white text-purple-700 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    📉 Diskon % dari Ecer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTierMode('MARGIN_FROM_COST')}
+                    className={`py-2 px-3 rounded-xl text-xs font-black transition-all ${
+                      tierMode === 'MARGIN_FROM_COST'
+                        ? 'bg-white text-purple-700 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    📈 Margin % di atas Modal
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  {tierMode === 'DISCOUNT_FROM_RETAIL'
+                    ? 'Harga grosir dihitung dari potongan % terhadap harga jual eceran produk.'
+                    : 'Harga grosir dihitung langsung dari HPP produk ditambah margin % yang Anda tentukan.'}
+                </p>
+              </div>
+
+              {/* Tabel Tingkatan Tier */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-700">Tingkatan Harga (Tier)</label>
+                  {tierRules.length < 5 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const last = tierRules[tierRules.length - 1];
+                        const nextQty = last ? last.minQty * 3 : 12;
+                        const nextVal = tierMode === 'DISCOUNT_FROM_RETAIL' ? (last ? last.value + 5 : 10) : (last ? Math.max(5, last.value - 5) : 15);
+                        setTierRules([
+                          ...tierRules,
+                          { minQty: nextQty, value: nextVal, label: `Grosir min.${nextQty}` },
+                        ]);
+                      }}
+                      className="text-xs text-purple-600 hover:text-purple-700 font-black flex items-center gap-1 hover:underline"
+                    >
+                      <Plus size={13} /> Tambah Tier
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  {tierRules.map((tier, idx) => (
+                    <div key={idx} className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-2xl">
+                      <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 text-xs font-black flex items-center justify-center shrink-0">
+                        {idx + 1}
+                      </div>
+
+                      <div className="flex-1">
+                        <label className="text-[10px] text-slate-400 font-bold block mb-0.5">Label Tier</label>
+                        <input
+                          type="text"
+                          value={tier.label}
+                          onChange={(e) => {
+                            const updated = [...tierRules];
+                            updated[idx] = { ...updated[idx], label: e.target.value };
+                            setTierRules(updated);
+                          }}
+                          className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none focus:border-purple-500"
+                          placeholder={`Tier ${idx + 1}`}
+                        />
+                      </div>
+
+                      <div className="w-24">
+                        <label className="text-[10px] text-slate-400 font-bold block mb-0.5">Min. Beli</label>
+                        <input
+                          type="number"
+                          min={idx === 0 ? 1 : 2}
+                          value={tier.minQty}
+                          disabled={idx === 0}
+                          onChange={(e) => {
+                            const updated = [...tierRules];
+                            updated[idx] = { ...updated[idx], minQty: Math.max(1, Number(e.target.value)) };
+                            setTierRules(updated);
+                          }}
+                          className={`w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none focus:border-purple-500 ${
+                            idx === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''
+                          }`}
+                        />
+                      </div>
+
+                      <div className="w-28">
+                        <label className="text-[10px] text-slate-400 font-bold block mb-0.5">
+                          {tierMode === 'DISCOUNT_FROM_RETAIL' ? 'Diskon (%)' : 'Margin (%)'}
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={tierMode === 'DISCOUNT_FROM_RETAIL' ? 90 : 500}
+                          value={tier.value}
+                          disabled={idx === 0 && tierMode === 'DISCOUNT_FROM_RETAIL'}
+                          onChange={(e) => {
+                            const updated = [...tierRules];
+                            updated[idx] = { ...updated[idx], value: Number(e.target.value) };
+                            setTierRules(updated);
+                          }}
+                          className={`w-full bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 outline-none focus:border-purple-500 ${
+                            idx === 0 && tierMode === 'DISCOUNT_FROM_RETAIL' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : ''
+                          }`}
+                        />
+                      </div>
+
+                      {tierRules.length > 2 && idx > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTierRules(tierRules.filter((_, i) => i !== idx));
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-colors mt-3"
+                          title="Hapus tier ini"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pembulatan */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Pembulatan Harga Akhir</label>
+                <select
+                  value={tierRoundingStep}
+                  onChange={(e) => setTierRoundingStep(Number(e.target.value))}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value={100}>Bulatkan ke Rp 100 terdekat (Contoh: Rp 9.450 → Rp 9.500)</option>
+                  <option value={500}>Bulatkan ke Rp 500 terdekat (Contoh: Rp 9.300 → Rp 9.500)</option>
+                  <option value={1000}>Bulatkan ke Rp 1.000 terdekat (Contoh: Rp 9.200 → Rp 9.000)</option>
+                  <option value={1}>Tanpa Pembulatan (Persis hasil hitung)</option>
+                </select>
+              </div>
+
+              {/* Live Preview Box */}
+              <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-2xl space-y-2">
+                <div className="flex items-center gap-1.5 text-purple-900 font-black text-xs">
+                  <Calculator size={14} className="text-purple-600" />
+                  <span>Simulasi Perhitungan (Contoh: Modal Rp 10.000, Ecer Rp 12.000)</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
+                  {tierRules.map((tier, idx) => {
+                    const sampleCost = 10000;
+                    const sampleRetail = 12000;
+                    let calculated = 0;
+                    if (tierMode === 'DISCOUNT_FROM_RETAIL') {
+                      calculated = sampleRetail * (1 - tier.value / 100);
+                    } else {
+                      calculated = sampleCost * (1 + tier.value / 100);
+                    }
+                    if (tierRoundingStep > 1) {
+                      calculated = Math.round(calculated / tierRoundingStep) * tierRoundingStep;
+                    }
+                    const sampleMarginRp = calculated - sampleCost;
+                    const sampleMarginPct = calculated > 0 ? (sampleMarginRp / calculated) * 100 : 0;
+                    return (
+                      <div key={idx} className="p-2 bg-white rounded-xl border border-purple-100 shadow-2xs">
+                        <span className="text-[10px] font-bold text-slate-400 block">{tier.label || `Tier ${idx + 1}`} (≥{tier.minQty})</span>
+                        <span className="font-black text-purple-700 text-xs block">Rp {calculated.toLocaleString('id-ID')}</span>
+                        <span className="text-[9px] font-bold text-slate-500">
+                          {tierMode === 'DISCOUNT_FROM_RETAIL' ? `Diskon ${tier.value}%` : `Margin ${tier.value}%`} · Untung Rp{sampleMarginRp.toLocaleString('id-ID')} ({sampleMarginPct.toFixed(0)}%)
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-6">
+              <button
+                type="button"
+                onClick={() => setShowTierModal(false)}
+                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkSetPriceTiers}
+                disabled={isResetting}
+                className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+              >
+                {isResetting ? '⏳ Menghitung & Menyimpan...' : `Terapkan ke ${selectedIds.size} Produk`}
               </button>
             </div>
           </div>

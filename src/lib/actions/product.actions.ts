@@ -2060,6 +2060,135 @@ export async function bulkUpdateTargetMargin(
   }
 }
 
+export interface BulkWholesaleOptions {
+  mode: 'DISCOUNT_PERCENT' | 'DISCOUNT_NOMINAL' | 'MARGIN_COST' | 'FIXED_PRICE';
+  value: number; // nilai persentase diskon, potongan nominal, persentase margin, atau harga grosir tetap
+  minQty: number; // minimal jumlah pembelian grosir
+  roundingStep?: number; // default 100
+  targetUnitMode?: 'BASE_ONLY' | 'ALL_UNITS';
+}
+
+/**
+ * Update harga grosir dan minimal pembelian secara masal untuk produk terpilih.
+ */
+export async function bulkUpdateWholesalePrice(
+  productIds: string[],
+  options: BulkWholesaleOptions,
+  adminEmail: string,
+): Promise<{ success: boolean; updated: number; error?: string }> {
+  await requireAdmin();
+  if (!productIds.length) return { success: true, updated: 0 };
+
+  const { mode, value, minQty, roundingStep = 100, targetUnitMode = 'BASE_ONLY' } = options;
+  const safeMinQty = Math.max(1, Number(minQty || 1));
+
+  try {
+    const now = new Date().toISOString();
+    let updated = 0;
+
+    for (const pid of productIds) {
+      const { data: prod } = await supabaseAdmin
+        .from('products')
+        .select('raw_data, cost_price, name, price, unit')
+        .eq('id', pid)
+        .single();
+
+      if (!prod) continue;
+
+      const cost = Number(prod.cost_price || 0);
+      const ecer = Number(prod.price || 0);
+      const existingRaw = prod.raw_data || {};
+      const baseUnit = (prod.unit || existingRaw.unit || existingRaw.Satuan || 'PCS').toUpperCase();
+
+      // Hitung harga grosir baru untuk satuan dasar
+      let newWholesalePrice = 0;
+      if (mode === 'DISCOUNT_PERCENT') {
+        const discountAmt = (ecer * Number(value || 0)) / 100;
+        newWholesalePrice = Math.max(cost, ecer - discountAmt);
+      } else if (mode === 'DISCOUNT_NOMINAL') {
+        newWholesalePrice = Math.max(cost, ecer - Number(value || 0));
+      } else if (mode === 'MARGIN_COST') {
+        newWholesalePrice = cost * (1 + Number(value || 0) / 100);
+      } else if (mode === 'FIXED_PRICE') {
+        newWholesalePrice = Number(value || 0);
+      }
+
+      // Pembulatan
+      const step = roundingStep > 0 ? roundingStep : 1;
+      newWholesalePrice = Math.max(0, Math.round(newWholesalePrice / step) * step);
+
+      const updatedRaw: Record<string, any> = {
+        ...existingRaw,
+        Grosir: newWholesalePrice,
+        priceGrosir: newWholesalePrice,
+        wholesalePrice: newWholesalePrice,
+        Min_Grosir: safeMinQty,
+        minWholesale: safeMinQty,
+        minWholesaleQty: safeMinQty,
+        updatedAt: now,
+      };
+
+      // Jika ada multi-units dan targetUnitMode === 'ALL_UNITS'
+      if (Array.isArray(existingRaw.units) && existingRaw.units.length > 0) {
+        updatedRaw.units = existingRaw.units.map((u: any) => {
+          const code = String(u.code || u.unit || '').trim().toUpperCase();
+          if (code === baseUnit) {
+            return {
+              ...u,
+              code,
+              contains: 1,
+              price: u.price || ecer,
+              priceGrosir: newWholesalePrice,
+              minQty: safeMinQty,
+            };
+          }
+          if (targetUnitMode === 'ALL_UNITS') {
+            const uPrice = Number(u.price || 0);
+            const uCost = cost * Number(u.contains || 1);
+            let uGrosir = 0;
+            if (mode === 'DISCOUNT_PERCENT') {
+              uGrosir = Math.max(uCost, uPrice * (1 - Number(value || 0) / 100));
+            } else if (mode === 'DISCOUNT_NOMINAL') {
+              uGrosir = Math.max(uCost, uPrice - (Number(value || 0) * Number(u.contains || 1)));
+            } else if (mode === 'MARGIN_COST') {
+              uGrosir = uCost * (1 + Number(value || 0) / 100);
+            } else {
+              uGrosir = Number(value || 0) * Number(u.contains || 1);
+            }
+            uGrosir = Math.max(0, Math.round(uGrosir / step) * step);
+            return {
+              ...u,
+              priceGrosir: uGrosir,
+              minQty: safeMinQty,
+            };
+          }
+          return u;
+        });
+      }
+
+      const { error: upErr } = await supabaseAdmin
+        .from('products')
+        .update({
+          raw_data: updatedRaw,
+          updated_at: now,
+        })
+        .eq('id', pid);
+
+      if (!upErr) {
+        updated++;
+      }
+    }
+
+    revalidatePath('/admin/products/pricing-hpp');
+    revalidatePath('/admin/products');
+
+    return { success: true, updated };
+  } catch (err: any) {
+    console.error('bulkUpdateWholesalePrice error:', err);
+    return { success: false, updated: 0, error: err.message };
+  }
+}
+
 /**
  * Inisialisasi Baseline AVG PO = HPP Aktif untuk memulai perhitungan awal Moving Average yang profesional.
  * - Jika produk sudah punya riwayat PO di purchases, semua harga beli di itemnya dinormalisasikan ke HPP aktif saat ini.
@@ -4125,4 +4254,95 @@ export async function getProductsForBulkPrintAction(
       error: err?.message || 'Gagal memuat produk untuk cetak label',
     };
   }
+}
+
+// ─── BULK SET PRICE TIERS ───────────────────────────────────────────────────
+
+export interface PriceTierRule {
+  minQty: number;
+  /** value meaning depends on mode */
+  value: number;
+  label?: string;
+}
+
+export interface BulkPriceTiersOptions {
+  /** DISCOUNT_FROM_RETAIL: value = diskon % dari harga ecer.
+   *  MARGIN_FROM_COST: value = margin % di atas HPP */
+  mode: 'DISCOUNT_FROM_RETAIL' | 'MARGIN_FROM_COST';
+  tiers: PriceTierRule[]; // tier[0] = ecer (minQty=1,value=0), tier[1..n] = grosir
+  roundingStep?: number;  // 100 | 500 | 1000
+}
+
+export async function bulkSetPriceTiers(
+  productIds: string[],
+  options: BulkPriceTiersOptions,
+  adminEmail: string
+): Promise<{ success: boolean; updated: number; error?: string }> {
+  'use server';
+  await requireAdmin();
+  if (!productIds.length) return { success: false, updated: 0, error: 'No products selected' };
+  const { mode, tiers, roundingStep = 100 } = options;
+  if (!tiers || tiers.length < 2) return { success: false, updated: 0, error: 'Minimal 2 tier diperlukan' };
+
+  const round = (n: number) => roundingStep > 0 ? Math.round(n / roundingStep) * roundingStep : Math.round(n);
+
+  let updated = 0;
+  for (const productId of productIds) {
+    try {
+      const { data: product, error: fetchErr } = await supabaseAdmin
+        .from('products')
+        .select('id, price, cost_price, raw_data')
+        .eq('id', productId)
+        .single();
+      if (fetchErr || !product) continue;
+
+      const rawData = (product.raw_data as any) || {};
+      const basePrice: number = Number(product.price ?? rawData.priceEcer ?? rawData.hargaJual ?? rawData.sellPrice ?? rawData.Ecer ?? 0);
+      const baseCost: number = Number(product.cost_price ?? rawData.costPrice ?? rawData.hpp ?? rawData.HPP ?? rawData.Modal ?? 0);
+
+      // Build computed tiers array
+      const computedTiers = tiers.map((tier) => {
+        let price: number;
+        if (mode === 'DISCOUNT_FROM_RETAIL') {
+          price = round(basePrice * (1 - tier.value / 100));
+        } else {
+          // MARGIN_FROM_COST: price = cost * (1 + margin/100)
+          price = round(baseCost * (1 + tier.value / 100));
+        }
+        price = Math.max(0, price);
+        return {
+          minQty: tier.minQty,
+          price,
+          label: tier.label ?? (tier.minQty === 1 ? 'Ecer' : `Grosir min.${tier.minQty}`),
+        };
+      });
+
+      // First non-ecer tier (index 1) becomes the main wholesale price for backward compat
+      const mainWholesaleTier = computedTiers.find(t => t.minQty > 1) ?? computedTiers[computedTiers.length - 1];
+
+      const updatedRawData = {
+        ...rawData,
+        priceTiers: computedTiers,
+        // backward compat fields
+        Grosir: mainWholesaleTier.price,
+        wholesalePrice: mainWholesaleTier.price,
+        priceGrosir: mainWholesaleTier.price,
+        Min_Grosir: mainWholesaleTier.minQty,
+        minWholesale: mainWholesaleTier.minQty,
+        minWholesaleQty: mainWholesaleTier.minQty,
+        Harga_Grosir: mainWholesaleTier.price,
+      };
+
+      const { error: updateErr } = await supabaseAdmin
+        .from('products')
+        .update({ raw_data: updatedRawData, updated_at: new Date().toISOString() })
+        .eq('id', productId);
+
+      if (!updateErr) updated++;
+    } catch {
+      // skip failed products
+    }
+  }
+
+  return { success: true, updated };
 }
