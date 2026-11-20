@@ -1488,8 +1488,8 @@ export default function EditProductPage() {
                     </label>
                     <div className="flex bg-slate-50/90 rounded-xl overflow-hidden border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:bg-white">
                       <input
-                        required
                         type="number"
+                        min="0"
                         className="w-full px-3 py-2 bg-transparent font-bold text-sm text-slate-800 outline-none"
                         value={modalInputStr}
                         placeholder="0"
