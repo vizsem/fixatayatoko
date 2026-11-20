@@ -2881,7 +2881,7 @@ export async function createParentAndAttachVariantsAction(payload: {
     // Ambil data produk varian untuk menyalin brand/kategori jika belum dispesifikasikan
     const { data: children, error: fetchErr } = await supabaseAdmin
       .from('products')
-      .select('id, name, unit, price, cost_price, raw_data, category, brand')
+      .select('id, name, unit, price, cost_price, raw_data, category')
       .in('id', variantProductIds);
 
     if (fetchErr || !children || children.length === 0) {
@@ -2891,7 +2891,7 @@ export async function createParentAndAttachVariantsAction(payload: {
     const firstChild = children[0];
     const firstRaw = (firstChild.raw_data && typeof firstChild.raw_data === 'object') ? firstChild.raw_data : {};
     const finalCategory = (category || firstChild.category || firstRaw.Kategori || firstRaw.category || 'UMUM').trim().toUpperCase();
-    const finalBrand = brand || firstChild.brand || firstRaw.brand || firstRaw.Brand || '';
+    const finalBrand = brand || firstRaw.brand || firstRaw.Brand || '';
     const baseUnit = String(firstChild.unit || firstRaw.unit || firstRaw.Satuan || 'PCS').toUpperCase();
 
     // Generate SKU jika belum ada
