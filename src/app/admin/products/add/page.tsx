@@ -1373,12 +1373,12 @@ export default function AddProductPage() {
                 const isCurrentBase = code === (formData.Satuan || 'PCS');
                 const isBaseHidden = isCurrentBase && hideBaseUnit;
                 const basePrice = Number(formData.Ecer || 0);
-                const contains = Number(current.contains || (code === 'PCS' ? 1 : 0));
+                const contains = Number(current.contains || (isCurrentBase ? 1 : 0));
                 const unitPrice = Number(current.price || 0);
                 const perPcs = contains > 0 ? Math.round(unitPrice / contains) : 0;
 
                 return (
-                  <div key={code} className={`p-4 rounded-2xl border relative group transition-all ${
+                  <div key={idx} className={`p-4 rounded-2xl border relative group transition-all ${
                     isBaseHidden 
                       ? 'bg-amber-50/40 border-dashed border-amber-300 opacity-80' 
                       : defaultSellUnit === code 
@@ -1395,7 +1395,7 @@ export default function AddProductPage() {
                         ⭐ Satuan Utama Kasir
                       </div>
                     )}
-                    {code !== 'PCS' && (
+                    {idx > 0 && !isCurrentBase && (
                       <button
                         type="button"
                         onClick={() => {
@@ -1404,23 +1404,51 @@ export default function AddProductPage() {
                           setUnits(next);
                         }}
                         className="absolute top-2 right-2 p-1 bg-red-100 text-red-600 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-red-200"
+                        title="Hapus Satuan"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
                       </button>
                     )}
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <div className="text-xs font-black uppercase text-gray-400">{code}</div>
-                      <input
-                        type="text"
-                        className="w-32 bg-white p-2 rounded-xl text-xs font-black text-gray-700 outline-none border"
-                        placeholder="Nama satuan"
-                        value={current.label || ''}
-                        onChange={(e) => {
-                          const next = [...units];
-                          next[idx] = { ...current, label: e.target.value };
-                          setUnits(next);
-                        }}
-                      />
+                    <div className="flex items-center justify-between gap-2.5 mb-2.5">
+                      <div className="flex-1 min-w-0">
+                        <label className="text-[10px] font-black uppercase text-gray-500 block mb-1">
+                          Nama / Kode Satuan
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full bg-white px-3 py-2 rounded-xl text-xs font-black uppercase text-gray-800 outline-none border border-gray-300 focus:border-blue-500 font-mono tracking-wide"
+                          placeholder="Nama Satuan (BOX, DUS, PAK)"
+                          value={current.code || ''}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            const next = [...units];
+                            next[idx] = { ...current, code: val };
+                            setUnits(next);
+                            if (defaultSellUnit === code) {
+                              setDefaultSellUnit(val);
+                            }
+                            if (isCurrentBase) {
+                              setFormData(prev => ({ ...prev, Satuan: val }));
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <label className="text-[10px] font-black uppercase text-gray-500 block mb-1">
+                          Label / Keterangan
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full bg-white px-3 py-2 rounded-xl text-xs font-bold text-gray-700 outline-none border border-gray-200 focus:border-blue-500"
+                          placeholder="Contoh: Dus Sedang"
+                          value={current.label || ''}
+                          onChange={(e) => {
+                            const next = [...units];
+                            next[idx] = { ...current, label: e.target.value };
+                            setUnits(next);
+                          }}
+                        />
+                      </div>
                     </div>
 
                     {/* BARCODE PER SATUAN */}
@@ -1578,21 +1606,21 @@ export default function AddProductPage() {
                         <span className="text-xs font-black text-gray-500 uppercase">Isi</span>
                         <input
                           type="number"
-                          disabled={code === 'PCS'}
+                          disabled={isCurrentBase}
                           className="w-32 bg-white p-3 rounded-xl text-sm font-black text-right outline-none border disabled:opacity-60"
-                          value={code === 'PCS' ? 1 : (current.contains || '')}
+                          value={isCurrentBase ? 1 : (current.contains || '')}
                           onChange={(e) => {
                             const val = e.target.value === '' ? undefined : Number(e.target.value);
                             const next = [...units];
-                            next[idx] = { ...current, contains: code === 'PCS' ? 1 : val };
+                            next[idx] = { ...current, contains: isCurrentBase ? 1 : val };
                             setUnits(next);
                           }}
                         />
                       </div>
-                      {code !== 'PCS' && (
+                      {!isCurrentBase && (
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex flex-col">
-                            <span className="text-xs font-black text-orange-600 uppercase">Modal / {code}</span>
+                            <span className="text-xs font-black text-orange-600 uppercase">Modal / {current.code || code}</span>
                             <span className="text-[10px] font-bold text-gray-400">Kalkulator otomatis</span>
                           </div>
                           <UnitModalCalculator

@@ -1735,9 +1735,24 @@ export default function EditProductPage() {
                         {/* Header Satuan Card */}
                         <div className="flex items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
                           <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 bg-slate-900 text-white rounded-lg text-xs font-black uppercase">
-                              {code}
-                            </span>
+                            <input
+                              type="text"
+                              className="w-20 px-2 py-0.5 bg-slate-900 text-white rounded-lg text-xs font-black uppercase outline-none focus:ring-2 focus:ring-blue-400 font-mono tracking-wide"
+                              value={u.code || ''}
+                              onChange={(e) => {
+                                const newCode = e.target.value.toUpperCase();
+                                const next = [...units];
+                                next[idx] = { ...u, code: newCode };
+                                setUnits(next);
+                                if (defaultSellUnit === code) {
+                                  setDefaultSellUnit(newCode);
+                                }
+                                if (isCurrentBase) {
+                                  setFormData(prev => ({ ...prev, Satuan: newCode }));
+                                }
+                              }}
+                              placeholder="KODE"
+                            />
                             {isCurrentBase && (
                               <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-1.5 py-0.2 rounded">
                                 Satuan Dasar
