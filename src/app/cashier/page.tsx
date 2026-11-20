@@ -64,6 +64,7 @@ type Product = {
   // Customer tier prices
   priceSemiGrosir?: number;
   priceGrosir?: number;
+  priceTiers?: Array<{ minQty: number; price: number; label?: string }>;
   channelPricing?: ChannelPricing | {
     offline?: { price?: number };
     website?: { price?: number };
@@ -420,7 +421,17 @@ export default function CashierPOS() {
         }
         const nextQty = exist.quantity + 1;
         let newPrice = exist.price;
-        if (product.units && product.units.length > 0) {
+        if (product.priceTiers && product.priceTiers.length > 0) {
+          const sortedTiers = [...product.priceTiers]
+            .filter(t => t.minQty > 1 && t.price > 0)
+            .sort((a, b) => b.minQty - a.minQty);
+          const reachedTier = sortedTiers.find(t => nextQty >= t.minQty);
+          if (reachedTier) {
+            newPrice = reachedTier.price;
+          } else {
+            newPrice = product.price;
+          }
+        } else if (product.units && product.units.length > 0) {
           const higherUnits = product.units
             .filter(u => u.code !== (product.unit || 'PCS') && Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
             .sort((a, b) => Number(b.contains) - Number(a.contains));
@@ -606,29 +617,41 @@ export default function CashierPOS() {
         return prev; // Do not update
       }
 
-      // Cek apakah item ini adalah satuan dasar (PCS) dan kuantiti menembus satuan di atasnya
+      // Cek apakah item ini adalah satuan dasar (PCS) dan kuantiti menembus tier grosir atau satuan di atasnya
       const isBaseUnit = (item.contains || 1) === 1;
       let effectivePrice = item.price;
 
-      if (isBaseUnit && product.units && product.units.length > 0) {
-        const higherUnits = product.units
-          .filter(u => u.code !== (product.unit || 'PCS') && Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
-          .sort((a, b) => Number(b.contains) - Number(a.contains));
-        
-        const reachedHigher = higherUnits.find(u => q >= Number(u.contains));
-        if (reachedHigher) {
-          // Otomatis terapkan tarif satuan di atasnya per PCS
-          effectivePrice = Number(reachedHigher.price) / Number(reachedHigher.contains);
-        } else {
-          // Kembali ke harga eceran semula (atau tier pelanggan)
-          const tierResult = resolveCustomerUnitPrice({
-            baseEcer: product.price,
-            priceSemiGrosir: product.priceSemiGrosir,
-            priceGrosir: product.priceGrosir,
-            customerType: selectedCustomer?.customerType,
-            contains: 1,
-          });
-          effectivePrice = tierResult.effectivePrice;
+      if (isBaseUnit) {
+        if (product.priceTiers && product.priceTiers.length > 0) {
+          const sortedTiers = [...product.priceTiers]
+            .filter(t => t.minQty > 1 && t.price > 0)
+            .sort((a, b) => b.minQty - a.minQty);
+          const reachedTier = sortedTiers.find(t => q >= t.minQty);
+          if (reachedTier) {
+            effectivePrice = reachedTier.price;
+          } else {
+            effectivePrice = product.price;
+          }
+        } else if (product.units && product.units.length > 0) {
+          const higherUnits = product.units
+            .filter(u => u.code !== (product.unit || 'PCS') && Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
+            .sort((a, b) => Number(b.contains) - Number(a.contains));
+          
+          const reachedHigher = higherUnits.find(u => q >= Number(u.contains));
+          if (reachedHigher) {
+            // Otomatis terapkan tarif satuan di atasnya per PCS
+            effectivePrice = Number(reachedHigher.price) / Number(reachedHigher.contains);
+          } else {
+            // Kembali ke harga eceran semula (atau tier pelanggan)
+            const tierResult = resolveCustomerUnitPrice({
+              baseEcer: product.price,
+              priceSemiGrosir: product.priceSemiGrosir,
+              priceGrosir: product.priceGrosir,
+              customerType: selectedCustomer?.customerType,
+              contains: 1,
+            });
+            effectivePrice = tierResult.effectivePrice;
+          }
         }
       }
 
@@ -642,6 +665,14 @@ export default function CashierPOS() {
   }, []);
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.quantity), 0), [cart]);
+
+  const cartSavings = useMemo(() => {
+    return cart.reduce((sum, item) => {
+      const origPrice = Number(item.originalPrice || item.price || 0);
+      const currPrice = Number(item.price || 0);
+      return sum + (origPrice > currPrice ? (origPrice - currPrice) * item.quantity : 0);
+    }, 0);
+  }, [cart]);
 
   const shippingCost = useMemo(() => {
     const rates: Record<string, number> = { 'Ambil di Toko': 0, 'Kurir Toko': 15000, 'OJOL': 0 };
@@ -1094,6 +1125,7 @@ export default function CashierPOS() {
             channelPricing: raw.channelPricing,
             priceSemiGrosir: Number(raw.priceSemiGrosir || 0) || undefined,
             priceGrosir: Number(raw.priceGrosir || 0) || undefined,
+            priceTiers: Array.isArray(raw.priceTiers) ? raw.priceTiers : undefined,
             parentId: (raw.Parent_ID || raw.parentId || raw.parent_id || '').toString().trim() || undefined,
             isParentOnly: Boolean(raw.isParentOnly || raw.is_parent_only),
           });
@@ -1984,24 +2016,66 @@ export default function CashierPOS() {
           
           <div class="line"></div>
           
-          ${order.items?.map((i: CartItem) => `
-            <div class="item-row">
-              <div class="item-name">${formatProductName(i.name)}</div>
-              <div class="item-detail">
-                <span>${i.quantity} x ${i.price.toLocaleString('id-ID')}</span>
-                <span>${(i.price * i.quantity).toLocaleString('id-ID')}</span>
-              </div>
-            </div>
-          `).join('')}
+          ${(() => {
+            const savings = (order.items || []).reduce((acc: number, i: CartItem) => {
+              const orig = Number(i.originalPrice || i.price || 0);
+              const cur = Number(i.price || 0);
+              return acc + (orig > cur ? (orig - cur) * Number(i.quantity || 1) : 0);
+            }, 0);
+
+            const itemsHtml = (order.items || []).map((i: CartItem) => {
+              const orig = Number(i.originalPrice || i.price || 0);
+              const cur = Number(i.price || 0);
+              const itemSave = orig > cur ? (orig - cur) * Number(i.quantity || 1) : 0;
+              return `
+              <div class="item-row">
+                <div class="item-name">${formatProductName(i.name)}</div>
+                <div class="item-detail">
+                  <span>${i.quantity} x ${cur.toLocaleString('id-ID')}${itemSave > 0 ? ` <span style="font-size:8px;">(Hemat ${itemSave.toLocaleString('id-ID')})</span>` : ''}</span>
+                  <span>${(cur * i.quantity).toLocaleString('id-ID')}</span>
+                </div>
+              </div>`;
+            }).join('');
+
+            return itemsHtml;
+          })()}
           
           <div class="line"></div>
           
+          ${(() => {
+            const savings = (order.items || []).reduce((acc: number, i: CartItem) => {
+              const orig = Number(i.originalPrice || i.price || 0);
+              const cur = Number(i.price || 0);
+              return acc + (orig > cur ? (orig - cur) * Number(i.quantity || 1) : 0);
+            }, 0);
+            if (savings > 0) {
+              return `
+              <div class="flex"><span>Subtotal Normal</span><span>${formatRp((order.subtotal || 0) + savings)}</span></div>
+              <div class="flex" style="color:#15803d;font-weight:bold;"><span>Hemat Grosir</span><span>-${formatRp(savings)}</span></div>
+              `;
+            }
+            return '';
+          })()}
           <div class="flex"><span>Subtotal</span><span>${formatRp(order.subtotal)}</span></div>
           ${(order.shippingCost || 0) > 0 ? `<div class="flex"><span>Ongkir</span><span>${formatRp(order.shippingCost)}</span></div>` : ''}
           
           <div class="flex bold" style="font-size: 12px; margin-top: 2px;">
             <span>TOTAL</span><span>${formatRp(order.total)}</span>
           </div>
+          ${(() => {
+            const savings = (order.items || []).reduce((acc: number, i: CartItem) => {
+              const orig = Number(i.originalPrice || i.price || 0);
+              const cur = Number(i.price || 0);
+              return acc + (orig > cur ? (orig - cur) * Number(i.quantity || 1) : 0);
+            }, 0);
+            if (savings > 0) {
+              return `
+              <div class="line"></div>
+              <div class="text-center bold" style="font-size: 11px; padding: 2px 0;">🎉 ANDA HEMAT: ${formatRp(savings)}!</div>
+              `;
+            }
+            return '';
+          })()}
           
           <div class="line"></div>
           
@@ -2546,6 +2620,11 @@ export default function CashierPOS() {
                               item.appliedTier === 'Grosir' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'
                             }`}>{item.appliedTier}</span>
                           )}
+                          {item.originalPrice > item.price && (
+                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                              Hemat Rp{((item.originalPrice - item.price) * item.quantity).toLocaleString('id-ID')}
+                            </span>
+                          )}
                         </div>
                       </div>
                       {editingPriceId === item.id ? (
@@ -2848,6 +2927,13 @@ export default function CashierPOS() {
                       }} />
                     </label>
                     <p className="text-xs text-center text-gray-400 font-bold uppercase">Auto-Compress to 200KB</p>
+                  </div>
+                )}
+
+                {cartSavings > 0 && (
+                  <div className="flex justify-between items-center py-1.5 px-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800">
+                    <span className="font-bold flex items-center gap-1">🎉 Hemat Belanja Grosir:</span>
+                    <span className="font-black">-Rp{cartSavings.toLocaleString('id-ID')}</span>
                   </div>
                 )}
 

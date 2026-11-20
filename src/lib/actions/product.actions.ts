@@ -4042,6 +4042,11 @@ export interface BulkPrintProductItem {
   unit: string;
   sku: string;
   barcode: string;
+  priceTiers?: Array<{
+    minQty: number;
+    price: number;
+    label?: string;
+  }>;
   units?: Array<{
     code: string;
     contains: number;
@@ -4156,6 +4161,7 @@ export async function getProductsForBulkPrintAction(
           unit: baseUnit,
           sku,
           barcode,
+          priceTiers: Array.isArray(raw.priceTiers) ? raw.priceTiers : undefined,
           units: Array.isArray(raw.units) ? raw.units : (Array.isArray(p.units) ? p.units : undefined),
         });
       }
@@ -4345,4 +4351,55 @@ export async function bulkSetPriceTiers(
   }
 
   return { success: true, updated };
+}
+
+/**
+ * Mengubah status aktif / arsip produk secara massal.
+ */
+export async function bulkUpdateProductStatus(
+  productIds: string[],
+  isActive: boolean,
+  adminEmail: string
+): Promise<{ success: boolean; updated: number; error?: string }> {
+  'use server';
+  await requireAdmin();
+  if (!productIds.length) return { success: true, updated: 0 };
+
+  try {
+    const now = new Date().toISOString();
+    let updated = 0;
+
+    for (const pid of productIds) {
+      const { data: prod } = await supabaseAdmin
+        .from('products')
+        .select('raw_data')
+        .eq('id', pid)
+        .single();
+
+      const existingRaw = (prod?.raw_data as any) || {};
+      const updatedRaw = {
+        ...existingRaw,
+        isActive,
+        is_active: isActive,
+        status: isActive ? 'ACTIVE' : 'ARCHIVED',
+        updatedAt: now,
+      };
+
+      const { error } = await supabaseAdmin
+        .from('products')
+        .update({
+          is_active: isActive,
+          raw_data: updatedRaw,
+          updated_at: now,
+        })
+        .eq('id', pid);
+
+      if (!error) updated++;
+    }
+
+    return { success: true, updated };
+  } catch (err: any) {
+    console.error('bulkUpdateProductStatus error:', err);
+    return { success: false, updated: 0, error: err?.message || 'Gagal mengubah status aktif/arsip produk' };
+  }
 }

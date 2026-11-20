@@ -65,13 +65,34 @@ export const generateESCReceipt = (order: any): string => {
   receipt += `Plg: ${order.customerName || 'Umum'}\n`;
   receipt += '--------------------------------\n';
   
+  let totalSavings = 0;
+  order.items?.forEach((i: any) => {
+    const origPrice = Number(i.originalPrice || i.price || 0);
+    const currPrice = Number(i.price || 0);
+    if (origPrice > currPrice) {
+      totalSavings += (origPrice - currPrice) * Number(i.quantity || 1);
+    }
+  });
+
   // Items
   order.items?.forEach((i: any) => {
     receipt += `${i.name}\n`;
-    receipt += `${i.quantity} x ${i.price.toLocaleString('id-ID')}   ${(i.price * i.quantity).toLocaleString('id-ID')}\n`;
+    const origPrice = Number(i.originalPrice || i.price || 0);
+    const currPrice = Number(i.price || 0);
+    if (origPrice > currPrice) {
+      const itemSave = (origPrice - currPrice) * Number(i.quantity || 1);
+      receipt += `${i.quantity} x ${currPrice.toLocaleString('id-ID')} (Hemat ${itemSave.toLocaleString('id-ID')})   ${(currPrice * i.quantity).toLocaleString('id-ID')}\n`;
+    } else {
+      receipt += `${i.quantity} x ${currPrice.toLocaleString('id-ID')}   ${(currPrice * i.quantity).toLocaleString('id-ID')}\n`;
+    }
   });
   
   receipt += '--------------------------------\n';
+  if (totalSavings > 0) {
+    const normalSubtotal = (order.subtotal || 0) + totalSavings;
+    receipt += `Subtotal Normal  ${normalSubtotal.toLocaleString('id-ID')}\n`;
+    receipt += `Hemat Grosir    -${totalSavings.toLocaleString('id-ID')}\n`;
+  }
   receipt += `Subtotal         ${order.subtotal?.toLocaleString('id-ID')}\n`;
   if (order.shippingCost > 0) {
     receipt += `Ongkir           ${order.shippingCost.toLocaleString('id-ID')}\n`;
@@ -80,6 +101,10 @@ export const generateESCReceipt = (order: any): string => {
   receipt += '--------------------------------\n';
   receipt += `Bayar (${order.paymentMethod})    ${order.payAmount?.toLocaleString('id-ID')}\n`;
   receipt += `Kembali          ${order.changeAmount?.toLocaleString('id-ID')}\n`;
+  if (totalSavings > 0) {
+    receipt += '--------------------------------\n';
+    receipt += ALIGN_CENTER + BOLD_ON + `ANDA HEMAT: Rp ${totalSavings.toLocaleString('id-ID')}!\n` + BOLD_OFF + ALIGN_LEFT;
+  }
   
   // Footer
   receipt += '\n' + ALIGN_CENTER;

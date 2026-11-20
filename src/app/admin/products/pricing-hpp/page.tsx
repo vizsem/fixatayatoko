@@ -10,7 +10,7 @@ import {
   ChevronRight, Percent, Sparkles, AlertCircle, RotateCcw,
   CheckSquare, Square, CheckCircle2, Info, Zap, Split,
   Lock, Unlock, Plus, Trash2, Tag, ShieldCheck, Calculator,
-  Receipt, Building2
+  Receipt, Building2, Archive
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import notify from '@/lib/notify';
@@ -37,6 +37,7 @@ import {
   bulkSetPriceTiers,
   type BulkPriceTiersOptions,
   type PriceTierRule,
+  bulkUpdateProductStatus,
 } from '@/lib/actions/product.actions';
 
 export interface ProductUnitItem {
@@ -412,8 +413,18 @@ export default function PricingHPPPage() {
     let taxableCount = 0;
     let exemptCount = 0;
     let pph22Count = 0;
+    let wholesaleCount = 0;
+    let activeCount = 0;
+    let archivedCount = 0;
 
     products.forEach(p => {
+      if (p.isActive) activeCount++;
+      else archivedCount++;
+
+      if ((p.priceTiers && p.priceTiers.length > 1) || p.priceGrosir > 0) {
+        wholesaleCount++;
+      }
+
       totalStockValue += Math.max(0, p.inventoryValue);
       totalPotentialRevenue += Math.max(0, p.potentialRevenue);
       totalPotentialProfit += p.potentialProfit;
@@ -443,6 +454,9 @@ export default function PricingHPPPage() {
       taxableCount,
       exemptCount,
       pph22Count,
+      wholesaleCount,
+      activeCount,
+      archivedCount,
     };
   }, [products, avgHppMap]);
 
@@ -867,6 +881,29 @@ export default function PricingHPPPage() {
     });
   };
 
+  const handleBulkUpdateStatus = (isActive: boolean) => {
+    if (selectedIds.size === 0) {
+      notify.error('Pilih minimal 1 produk terlebih dahulu');
+      return;
+    }
+    const actionLabel = isActive ? 'mengaktifkan' : 'mengarsipkan';
+    if (!window.confirm(`Yakin ingin ${actionLabel} ${selectedIds.size} produk terpilih?`)) return;
+
+    startResetTransition(async () => {
+      try {
+        const userRes = await supabase.auth.getUser();
+        const adminEmail = userRes.data.user?.email || 'admin';
+        const result = await bulkUpdateProductStatus(Array.from(selectedIds), isActive, adminEmail);
+        if (!result.success) throw new Error(result.error);
+        notify.success(`✅ Berhasil ${actionLabel} ${result.updated} produk`);
+        setSelectedIds(new Set());
+        await fetchData();
+      } catch (err: any) {
+        notify.error(err.message || `Gagal ${actionLabel} produk`);
+      }
+    });
+  };
+
   // Reset AVG dari Stok Terkini (skenario produk pernah kosong)
   const handleConfirmResetFromStock = () => {
     startResetTransition(async () => {
@@ -1137,8 +1174,10 @@ export default function PricingHPPPage() {
               <span className="text-[10px] md:text-xs font-black uppercase tracking-wider text-slate-400 leading-tight">Produk Aktif</span>
               <div className="p-1.5 md:p-2 bg-blue-50 rounded-xl shrink-0"><Package size={16} /></div>
             </div>
-            <p className="text-2xl md:text-3xl font-black text-slate-900">{kpis.totalCount}</p>
-            <p className="text-xs font-bold text-slate-400">Siap dijual</p>
+            <p className="text-2xl md:text-3xl font-black text-slate-900">{kpis.activeCount}</p>
+            <p className="text-[10px] md:text-xs font-bold text-slate-400">
+              <span className="text-purple-600 font-extrabold">{kpis.wholesaleCount} Grosir Tier</span> · <span className="text-slate-500">{kpis.archivedCount} Arsip</span>
+            </p>
           </div>
 
           <div className="bg-white p-4 md:p-5 rounded-3xl border border-slate-100 shadow-sm space-y-1.5 md:space-y-2">
@@ -1439,6 +1478,24 @@ export default function PricingHPPPage() {
                   >
                     <Layers size={12} />
                     Tier Grosir
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBulkUpdateStatus(true)}
+                    className="px-3 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border border-teal-500/50 shadow-sm"
+                    title="Aktifkan produk terpilih agar muncul di kasir dan toko"
+                  >
+                    <CheckCircle2 size={12} />
+                    Aktifkan
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBulkUpdateStatus(false)}
+                    className="px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border border-slate-600 shadow-sm"
+                    title="Arsipkan / Sembunyikan produk terpilih dari kasir"
+                  >
+                    <Archive size={12} />
+                    Arsipkan
                   </button>
                 </div>
               </div>
@@ -3117,6 +3174,30 @@ export default function PricingHPPPage() {
                   <Calculator size={14} className="text-purple-600" />
                   <span>Simulasi Perhitungan (Contoh: Modal Rp 10.000, Ecer Rp 12.000)</span>
                 </div>
+                {(() => {
+                  const sampleCost = 10000;
+                  const sampleRetail = 12000;
+                  const hasLoss = tierRules.some((tier) => {
+                    const p = tierMode === 'DISCOUNT_FROM_RETAIL'
+                      ? sampleRetail * (1 - tier.value / 100)
+                      : sampleCost * (1 + tier.value / 100);
+                    return p <= sampleCost;
+                  });
+                  return (
+                    <div className={`p-2 rounded-xl border flex items-center gap-2 text-[11px] font-bold ${
+                      hasLoss
+                        ? 'bg-rose-50 border-rose-200 text-rose-700'
+                        : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                    }`}>
+                      <ShieldCheck size={15} className={hasLoss ? 'text-rose-600 shrink-0' : 'text-emerald-600 shrink-0'} />
+                      <span>
+                        {hasLoss
+                          ? '⚠️ Perhatian: Tier tertinggi melebihi margin keuntungan dan berisiko di bawah modal!'
+                          : '🛡️ Proteksi Anti-Boncos Aman: Semua tingkatan tier berada di atas modal HPP.'}
+                      </span>
+                    </div>
+                  );
+                })()}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[11px]">
                   {tierRules.map((tier, idx) => {
                     const sampleCost = 10000;

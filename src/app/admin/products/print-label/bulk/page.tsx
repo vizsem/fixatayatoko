@@ -156,8 +156,24 @@ function LabelCardItem({
             </div>
           )}
 
-          {/* Info Semi Grosir (Bukan Grosir, dan otomatis dihilangkan jika kuantiti PCS menembus satuan di atasnya) */}
+          {/* Info Semi Grosir / Tier Grosir */}
           {showWholesale && (() => {
+            if (item.priceTiers && item.priceTiers.length > 1) {
+              const activeTiers = item.priceTiers.filter(t => t.minQty > 1 && t.price > 0);
+              if (activeTiers.length > 0) {
+                return (
+                  <div className={`border border-black rounded-[2px] mt-0.5 leading-none shrink-0 text-black ${isSheet3 ? 'text-[7.5px] p-1' : isLarge ? 'text-[6.5px] p-0.5' : 'text-[5.5px] p-0.5'}`}>
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="uppercase text-black font-extrabold">Grosir:</span>
+                      <span className="font-bold text-black truncate ml-1">
+                        {activeTiers.map(t => `≥${t.minQty} @${formatRp(t.price)}`).join(' · ')}
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+            }
+
             const rawUnits = Array.isArray(item.units) ? item.units : [];
             const higherUnits = rawUnits
               .filter((u: any) => Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
