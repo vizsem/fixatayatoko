@@ -22,7 +22,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { getProductsForBulkPrintAction, BulkPrintProductItem } from '@/lib/actions/product.actions';
 import { sbGetDoc } from '@/lib/supabase-helpers';
 
-type LabelSize = '50x30' | '40x30' | '60x40' | '100x130_3';
+type LabelSize = '50x30' | '40x30' | '60x40' | '100x130_3' | '100x130_6';
 
 interface PrintableItem extends BulkPrintProductItem {
   copies: number;
@@ -48,9 +48,11 @@ function LabelCardItem({
   formatTitleCase: (s: string) => string;
   formatRp: (n: number) => string;
 }) {
-  const isSheet = labelSize === '100x130_3';
-  const isLarge = labelSize === '60x40' || isSheet;
-  const isSmall = labelSize === '40x30';
+  const isSheet3 = labelSize === '100x130_3';
+  const isSheet6 = labelSize === '100x130_6';
+  const isSheet = isSheet3 || isSheet6;
+  const isLarge = labelSize === '60x40' || isSheet3;
+  const isSmall = labelSize === '40x30' || isSheet6;
 
   const skuValue = String(item.sku || item.id.slice(0, 8)).trim();
   
@@ -67,9 +69,9 @@ function LabelCardItem({
       className={`bg-white ${isSheet ? 'w-full h-full' : 'border border-slate-300 print-exact-size page-break-here shadow-sm'}`}
       style={{ 
         width: isSheet ? '100%' : (labelSize === '60x40' ? '60mm' : labelSize === '40x30' ? '40mm' : '50mm'), 
-        height: isSheet ? '41mm' : (labelSize === '60x40' ? '40mm' : '30mm'),
-        maxHeight: isSheet ? '41mm' : (labelSize === '60x40' ? '40mm' : '30mm'),
-        padding: isSheet ? '1.5mm 3mm' : isLarge ? '1.5mm 2.2mm' : '1.2mm 2mm',
+        height: isSheet ? '39.5mm' : (labelSize === '60x40' ? '40mm' : '30mm'),
+        maxHeight: isSheet ? '39.5mm' : (labelSize === '60x40' ? '40mm' : '30mm'),
+        padding: isSheet6 ? '1mm 1.5mm' : isSheet3 ? '1.5mm 3mm' : isLarge ? '1.5mm 2.2mm' : '1.2mm 2mm',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -81,46 +83,46 @@ function LabelCardItem({
     >
       {/* Header Toko & Kategori */}
       <div className="flex justify-between items-center border-b border-black pb-0.5 leading-none">
-        <span className={`font-bold uppercase tracking-tight text-black ${isSheet ? 'text-[8.5px]' : isLarge ? 'text-[7.5px]' : 'text-[6.5px]'}`}>
+        <span className={`font-bold uppercase tracking-tight text-black ${isSheet3 ? 'text-[8.5px]' : isLarge ? 'text-[7.5px]' : 'text-[6.5px]'}`}>
           ATAYATOKO
         </span>
         <div className="flex items-center gap-1">
           {!showQr && (
-            <span className={`font-mono font-bold text-black uppercase ${isSheet ? 'text-[6.5px]' : isLarge ? 'text-[6px]' : 'text-[5px]'}`}>
+            <span className={`font-mono font-bold text-black uppercase ${isSheet3 ? 'text-[6.5px]' : isLarge ? 'text-[6px]' : 'text-[5px]'}`}>
               SKU: {skuValue} ·
             </span>
           )}
-          <span className={`font-bold uppercase truncate text-black ${isSheet ? 'text-[7px] max-w-[50mm]' : isLarge ? 'text-[6px] max-w-[34mm]' : 'text-[5px] max-w-[28mm]'}`}>
+          <span className={`font-bold uppercase truncate text-black ${isSheet3 ? 'text-[7px] max-w-[50mm]' : isLarge ? 'text-[6px] max-w-[34mm]' : 'text-[5px] max-w-[24mm]'}`}>
             {item.category || 'UMUM'}
           </span>
         </div>
       </div>
 
       {/* Area Tengah: Nama, Varian, Harga & QR */}
-      <div className="flex flex-row gap-1.5 mt-0.5 flex-1 min-h-0">
+      <div className="flex flex-row gap-1 mt-0.5 flex-1 min-h-0">
         {/* Kiri: Nama Produk, Varian, & Harga */}
         <div className="flex flex-col justify-between flex-1 min-w-0">
           <div className="min-w-0">
             {item.isVariant ? (
               <div className="flex items-center gap-1 min-w-0">
-                <h2 className={`font-bold leading-tight truncate text-black ${isSheet ? 'text-[11px]' : isLarge ? 'text-[9.5px]' : 'text-[7.5px]'}`} title={item.parentName || item.name}>
+                <h2 className={`font-bold leading-tight truncate text-black ${isSheet3 ? 'text-[11px]' : isLarge ? 'text-[9.5px]' : 'text-[7.5px]'}`} title={item.parentName || item.name}>
                   {formatTitleCase(item.parentName || item.name)}
                 </h2>
-                <span className={`bg-black text-white rounded-[2px] font-bold uppercase shrink-0 leading-none ${isSheet ? 'px-1.5 py-0.5 text-[7px]' : isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
+                <span className={`bg-black text-white rounded-[2px] font-bold uppercase shrink-0 leading-none ${isSheet3 ? 'px-1.5 py-0.5 text-[7px]' : isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
                   {item.variantName || 'VAR'}
                 </span>
               </div>
             ) : item.isUnitLabel ? (
               <div className="flex items-center gap-1 min-w-0">
-                <h2 className={`font-bold leading-tight truncate text-black ${isSheet ? 'text-[11px]' : isLarge ? 'text-[9.5px]' : 'text-[7.5px]'}`} title={item.parentName || item.name}>
+                <h2 className={`font-bold leading-tight truncate text-black ${isSheet3 ? 'text-[11px]' : isLarge ? 'text-[9.5px]' : 'text-[7.5px]'}`} title={item.parentName || item.name}>
                   {formatTitleCase(item.parentName || item.name)}
                 </h2>
-                <span className={`bg-black text-white rounded-[2px] font-bold uppercase shrink-0 leading-none ${isSheet ? 'px-1.5 py-0.5 text-[7px]' : isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
+                <span className={`bg-black text-white rounded-[2px] font-bold uppercase shrink-0 leading-none ${isSheet3 ? 'px-1.5 py-0.5 text-[7px]' : isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
                   {item.variantName || `SATUAN ${item.unit}`}
                 </span>
               </div>
             ) : (
-              <h2 className={`font-bold leading-tight line-clamp-2 text-black ${isSheet ? 'text-[11px]' : isLarge ? 'text-[9.5px]' : 'text-[7.5px]'}`} title={item.name}>
+              <h2 className={`font-bold leading-tight line-clamp-2 text-black ${isSheet3 ? 'text-[11px]' : isLarge ? 'text-[9.5px]' : 'text-[7.5px]'}`} title={item.name}>
                 {formatTitleCase(item.name)}
               </h2>
             )}
@@ -128,10 +130,10 @@ function LabelCardItem({
 
           {/* Harga Utama */}
           <div className="mt-0.5 flex items-baseline gap-1 leading-none">
-            <span className={`font-extrabold tracking-normal leading-none text-black ${isSheet ? 'text-[19px]' : isLarge ? 'text-[17px]' : isSmall ? 'text-[12px]' : 'text-[13.5px]'}`}>
+            <span className={`font-extrabold tracking-normal leading-none text-black ${isSheet3 ? 'text-[19px]' : isLarge ? 'text-[17px]' : isSmall ? 'text-[12.5px]' : 'text-[13.5px]'}`}>
               {formatRp(item.price)}
             </span>
-            <span className={`font-bold text-black uppercase ${isSheet ? 'text-[7.5px]' : isLarge ? 'text-[6.5px]' : 'text-[5.5px]'}`}>
+            <span className={`font-bold text-black uppercase ${isSheet3 ? 'text-[7.5px]' : isLarge ? 'text-[6.5px]' : 'text-[5.5px]'}`}>
               /{item.unit}
             </span>
           </div>
@@ -143,10 +145,10 @@ function LabelCardItem({
                 .filter((u: any) => u.code?.toUpperCase() !== item.unit.toUpperCase())
                 .map((u: any, idx: number) => (
                   <div key={idx} className="flex justify-between items-center leading-none text-black">
-                    <span className={`font-bold text-black uppercase ${isSheet ? 'text-[7px]' : isLarge ? 'text-[6px]' : 'text-[5px]'}`}>
+                    <span className={`font-bold text-black uppercase ${isSheet3 ? 'text-[7px]' : isLarge ? 'text-[6px]' : 'text-[5px]'}`}>
                       1 {u.code} <span className="font-normal text-black">({u.contains} {item.unit})</span>
                     </span>
-                    <span className={`font-bold tracking-normal text-black ${isSheet ? 'text-[8px]' : isLarge ? 'text-[7px]' : 'text-[6px]'}`}>
+                    <span className={`font-bold tracking-normal text-black ${isSheet3 ? 'text-[8px]' : isLarge ? 'text-[7px]' : 'text-[6px]'}`}>
                       {formatRp(u.price || (item.price * (u.contains || 1)))}
                     </span>
                   </div>
@@ -171,7 +173,7 @@ function LabelCardItem({
             if (minHigherContains > 1 && minQty >= minHigherContains) return null;
 
             return (
-              <div className={`flex items-center justify-between font-bold border border-black rounded-[2px] mt-0.5 leading-none shrink-0 text-black ${isSheet ? 'text-[7.5px] px-2 py-0.5' : isLarge ? 'text-[6.5px] px-1.5 py-0.5' : 'text-[5.5px] px-1 py-0.5'}`}>
+              <div className={`flex items-center justify-between font-bold border border-black rounded-[2px] mt-0.5 leading-none shrink-0 text-black ${isSheet3 ? 'text-[7.5px] px-2 py-0.5' : isLarge ? 'text-[6.5px] px-1.5 py-0.5' : 'text-[5.5px] px-1 py-0.5'}`}>
                 <span className="uppercase text-black font-bold">Semi Grosir:</span>
                 <span className="font-bold text-black">
                   &ge;{minQty} @{formatRp(semiPrice)}
@@ -183,11 +185,11 @@ function LabelCardItem({
 
         {/* Kanan: QR Code */}
         {showQr && (
-          <div className={`flex flex-col justify-center items-center shrink-0 pl-1 border-l border-dashed border-black ${isSheet ? 'w-[22mm]' : isLarge ? 'w-[19mm]' : 'w-[15mm]'}`}>
+          <div className={`flex flex-col justify-center items-center shrink-0 pl-1 border-l border-dashed border-black ${isSheet3 ? 'w-[22mm]' : isLarge ? 'w-[19mm]' : 'w-[14mm]'}`}>
             <div className="bg-white p-0.5 flex justify-center">
-              <QRCodeSVG value={skuValue} size={isSheet ? 56 : isLarge ? 52 : isSmall ? 38 : 44} level="L" marginSize={0} />
+              <QRCodeSVG value={skuValue} size={isSheet3 ? 54 : isLarge ? 50 : isSmall ? 36 : 42} level="L" marginSize={0} />
             </div>
-            <span className={`font-mono font-bold text-black uppercase tracking-normal mt-0.5 text-center leading-none ${isSheet ? 'text-[6px]' : isLarge ? 'text-[5px]' : 'text-[4px]'}`}>
+            <span className={`font-mono font-bold text-black uppercase tracking-normal mt-0.5 text-center leading-none ${isSheet3 ? 'text-[6px]' : isLarge ? 'text-[5px]' : 'text-[4px]'}`}>
               SKU: {skuValue}
             </span>
           </div>
@@ -200,11 +202,11 @@ function LabelCardItem({
           <div className="w-full flex justify-center items-center">
             <Barcode 
               value={pcsBarcode} 
-              width={isSheet ? 1.4 : isLarge ? 1.3 : 1.2} 
-              height={isSheet ? 22 : isLarge ? 24 : isSmall ? 16 : 19} 
-              fontSize={isSheet ? 8.5 : isLarge ? 8 : 7} 
+              width={isSheet3 ? 1.4 : isLarge ? 1.3 : 1.1} 
+              height={isSheet3 ? 20 : isLarge ? 22 : 15} 
+              fontSize={isSheet3 ? 8 : isLarge ? 8 : 7} 
               font='system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif'
-              margin={isSheet ? 2 : isLarge ? 3 : 2} 
+              margin={isSheet3 ? 2 : 1} 
               displayValue={true} 
               background="#ffffff"
               lineColor="#000000"
@@ -225,7 +227,7 @@ function BulkPrintContent() {
   const defaultIncludeVariants = searchParams.get('includeVariants') !== '0';
   const defaultIncludeUnits = searchParams.get('includeUnits') === '1';
   const defaultCopies = Math.max(1, parseInt(searchParams.get('copies') || '1', 10));
-  const defaultSize = (['50x30', '40x30', '60x40', '100x130_3'].includes(searchParams.get('size') || '') 
+  const defaultSize = (['50x30', '40x30', '60x40', '100x130_3', '100x130_6'].includes(searchParams.get('size') || '') 
     ? searchParams.get('size') 
     : '50x30') as LabelSize;
 
@@ -363,6 +365,7 @@ function BulkPrintContent() {
     '40x30': { width: '40mm', height: '30mm', widthMm: 40, heightMm: 30 },
     '60x40': { width: '60mm', height: '40mm', widthMm: 60, heightMm: 40 },
     '100x130_3': { width: '100mm', height: '130mm', widthMm: 100, heightMm: 130 },
+    '100x130_6': { width: '100mm', height: '130mm', widthMm: 100, heightMm: 130 },
   };
 
   const currentSize = sizeStyles[labelSize];
@@ -415,11 +418,15 @@ function BulkPrintContent() {
                   Cetak Label Rak Masal
                 </h1>
                 <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                  Thermal {labelSize === '100x130_3' ? '100x130 (3-in-1)' : labelSize}
+                  Thermal {labelSize === '100x130_6' ? '100x130 (6-in-1)' : labelSize === '100x130_3' ? '100x130 (3-in-1)' : labelSize}
                 </span>
               </div>
               <p className="text-xs font-bold text-slate-400">
-                {totalSelectedUnique} Produk / Varian dipilih • <strong className="text-blue-600">{labelSize === '100x130_3' ? `${Math.ceil(totalStickersToPrint / 3)} Lembar (${totalStickersToPrint} Stiker)` : `${totalStickersToPrint} Stiker`}</strong> akan dicetak
+                {totalSelectedUnique} Produk / Varian dipilih • <strong className="text-blue-600">
+                  {(labelSize === '100x130_3' || labelSize === '100x130_6') 
+                    ? `${Math.ceil(totalStickersToPrint / (labelSize === '100x130_6' ? 6 : 3))} Lembar (${totalStickersToPrint} Stiker)` 
+                    : `${totalStickersToPrint} Stiker`}
+                </strong> akan dicetak
               </p>
             </div>
           </div>
@@ -454,7 +461,8 @@ function BulkPrintContent() {
                 <option value="50x30">50mm x 30mm (Standar Rak Mini)</option>
                 <option value="40x30">40mm x 30mm (Kompak / Sempit)</option>
                 <option value="60x40">60mm x 40mm (Supermarket)</option>
-                <option value="100x130_3">100mm x 130mm (Lembar 3 Label @100x41mm)</option>
+                <option value="100x130_3">100mm x 130mm (Lembar 3 Label: 1x3 @96x39.5mm)</option>
+                <option value="100x130_6">100mm x 130mm (Lembar 6 Label: 2x3 @47x39.5mm)</option>
               </select>
             </div>
 
@@ -559,7 +567,7 @@ function BulkPrintContent() {
         <div className="bg-amber-50 border border-amber-200 text-amber-900 p-3.5 rounded-2xl text-xs font-bold flex items-start gap-3 mb-5">
           <AlertTriangle size={18} className="shrink-0 mt-0.5 text-amber-600" />
           <p className="leading-relaxed">
-            <strong>Petunjuk Printer Thermal Label:</strong> Atur ukuran kertas di browser ke <strong>{labelSize === '100x130_3' ? '100mm × 130mm (Portrait - 3 Label per Lembar)' : labelSize === '50x30' ? '50mm × 30mm' : labelSize === '40x30' ? '40mm × 30mm' : '60mm × 40mm'}</strong>, ubah <strong>Margins</strong> menjadi <strong>None</strong>, dan pastikan skala <strong>100%</strong>.
+            <strong>Petunjuk Printer Thermal Label:</strong> Atur ukuran kertas di browser ke <strong>{labelSize === '100x130_6' ? '100mm × 130mm (Portrait - 6 Label: 2 Kolom × 3 Baris)' : labelSize === '100x130_3' ? '100mm × 130mm (Portrait - 3 Label: 1 Kolom × 3 Baris)' : labelSize === '50x30' ? '50mm × 30mm' : labelSize === '40x30' ? '40mm × 30mm' : '60mm × 40mm'}</strong>, ubah <strong>Margins</strong> menjadi <strong>None</strong>, dan pastikan skala <strong>100%</strong>.
           </p>
         </div>
 
@@ -660,13 +668,15 @@ function BulkPrintContent() {
 
       {/* --- AREA CETAK (PRINT ENGINE) --- */}
       <div className="print-only-container flex flex-wrap justify-center gap-4 max-w-4xl mx-auto px-4">
-        {labelSize === '100x130_3' ? (
-          // Lembar Kertas 100mm x 130mm (Masing-masing lembar berisi 3 label bertingkat)
+        {(labelSize === '100x130_3' || labelSize === '100x130_6') ? (
+          // Lembar Kertas 100mm x 130mm (3 label bertingkat 1x3 ATAU 6 label grid 2x3)
           (() => {
+            const is6 = labelSize === '100x130_6';
+            const perSheet = is6 ? 6 : 3;
             const chunks: (PrintableItem | null)[][] = [];
-            for (let i = 0; i < printableList.length; i += 3) {
-              const slice: (PrintableItem | null)[] = printableList.slice(i, i + 3);
-              while (slice.length < 3) {
+            for (let i = 0; i < printableList.length; i += perSheet) {
+              const slice: (PrintableItem | null)[] = printableList.slice(i, i + perSheet);
+              while (slice.length < perSheet) {
                 slice.push(null);
               }
               chunks.push(slice);
@@ -675,12 +685,14 @@ function BulkPrintContent() {
             return chunks.map((sheetItems, sheetIdx) => (
               <div
                 key={`sheet-${sheetIdx}`}
-                className="bg-white border border-slate-300 print-sheet-container shadow-sm mb-6 flex flex-col justify-between"
+                className={`bg-white border border-slate-300 print-sheet-container shadow-sm mb-6 ${
+                  is6 ? 'grid grid-cols-2 gap-x-[2mm] gap-y-[1.5mm]' : 'flex flex-col justify-between'
+                }`}
                 style={{
                   width: '100mm',
-                  height: '130mm',
-                  maxHeight: '130mm',
-                  padding: '1.5mm',
+                  height: '128mm',
+                  maxHeight: '128mm',
+                  padding: '1.5mm 2mm',
                   boxSizing: 'border-box',
                   backgroundColor: '#ffffff',
                 }}
@@ -690,9 +702,9 @@ function BulkPrintContent() {
                     key={`slot-${itemIdx}`}
                     className="print-label-slot relative border border-dashed border-slate-200"
                     style={{
-                      width: '100%',
-                      height: '41mm',
-                      maxHeight: '41mm',
+                      width: is6 ? '47mm' : '100%',
+                      height: '39.5mm',
+                      maxHeight: '39.5mm',
                       boxSizing: 'border-box',
                       overflow: 'hidden',
                     }}
@@ -709,8 +721,8 @@ function BulkPrintContent() {
                         formatRp={formatRp}
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-300 no-print select-none">
-                        Slot Stiker Kosong #{itemIdx + 1}
+                      <div className="w-full h-full flex items-center justify-center text-[9px] font-bold text-slate-300 no-print select-none">
+                        Slot Kosong #{itemIdx + 1}
                       </div>
                     )}
                   </div>
@@ -740,13 +752,14 @@ function BulkPrintContent() {
         __html: `
           @media print {
             @page {
-              size: ${labelSize === '100x130_3' ? '100mm 130mm portrait' : `${currentSize.width} ${currentSize.height} landscape`};
+              size: ${(labelSize === '100x130_3' || labelSize === '100x130_6') ? '100mm 130mm portrait' : `${currentSize.width} ${currentSize.height} landscape`};
               margin: 0 !important;
             }
-            body {
+            html, body {
               background: white !important;
               margin: 0 !important;
               padding: 0 !important;
+              height: 100% !important;
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
@@ -758,39 +771,37 @@ function BulkPrintContent() {
             }
             .print-only-container {
               display: block !important;
-              margin: 0 !important;
+              position: static !important;
+              margin: 0 auto !important;
               padding: 0 !important;
-              position: absolute !important;
-              top: 0 !important;
-              left: 0 !important;
               width: ${currentSize.width} !important;
               background: white !important;
-              z-index: 9999 !important;
+              z-index: auto !important;
             }
             .print-sheet-container {
               width: 100mm !important;
-              height: 130mm !important;
-              max-height: 130mm !important;
+              height: 128mm !important;
+              max-height: 128mm !important;
               border: none !important;
               box-shadow: none !important;
-              padding: 1.5mm !important;
+              padding: 1.5mm 2mm !important;
               box-sizing: border-box !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
               page-break-after: always !important;
               break-after: page !important;
               overflow: hidden !important;
-              margin: 0 !important;
+              margin: 0 auto !important;
             }
-            .print-sheet-container:last-child {
-              page-break-after: auto !important;
-              break-after: auto !important;
+            .print-sheet-container:last-child,
+            .print-sheet-container:last-of-type {
+              page-break-after: avoid !important;
+              break-after: avoid !important;
             }
             .print-label-slot {
-              width: 100% !important;
-              height: 41mm !important;
-              max-height: 41mm !important;
-              border: none !important;
               box-sizing: border-box !important;
               overflow: hidden !important;
+              border: none !important;
             }
             .print-exact-size {
               width: ${currentSize.width} !important;
@@ -811,8 +822,8 @@ function BulkPrintContent() {
               break-after: page !important;
             }
             .page-break-here:last-child {
-              page-break-after: auto !important;
-              break-after: auto !important;
+              page-break-after: avoid !important;
+              break-after: avoid !important;
             }
             svg {
               shape-rendering: crispEdges !important;
