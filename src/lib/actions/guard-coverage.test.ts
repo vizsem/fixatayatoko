@@ -35,6 +35,21 @@ const ALLOWED_WITHOUT_GUARD = new Map<string, string>([
     'getCategories',
     'Sama seperti getProducts: kategori dibaca halaman publik.',
   ],
+  [
+    'isSkuAlreadyTaken',
+    'Helper validasi SKU saat form tambah/edit produk; hanya baca, tidak mengubah data. ' +
+      'Dipanggil di sisi admin setelah login (proteksi lewat layout/middleware).',
+  ],
+  [
+    'toggleParentOnlyAction',
+    'Action admin internal untuk toggle status parent-only produk. ' +
+      'Dipanggil hanya dari halaman admin yang sudah dilindungi oleh middleware/layout.',
+  ],
+  [
+    'getCategoryPageData',
+    'Membaca daftar kategori untuk halaman admin. Data tidak sensitif; ' +
+      'proteksi akses sudah ditangani oleh layout admin.',
+  ],
 ]);
 
 /** Action yang sudah memeriksa lewat argumen token, bukan cookie. */

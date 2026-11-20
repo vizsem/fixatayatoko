@@ -132,6 +132,8 @@ export default function EditProductPage() {
   const [newKategoriInput, setNewKategoriInput] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile2, setImageFile2] = useState<File | null>(null);
+  const [imagePreview2, setImagePreview2] = useState<string | null>(null);
   const originalImageUrlRef = useRef('');
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -186,6 +188,7 @@ export default function EditProductPage() {
     Min_Grosir: 1,
     weight: 0, // Berat satuan dasar dalam gram
     Link_Foto: '',
+    Link_Foto2: '',
     Deskripsi: '',
     Status: 1,
     Supplier: '',
@@ -481,6 +484,7 @@ export default function EditProductPage() {
           Ecer: Number(spRow.price ?? raw.Ecer ?? raw.price ?? 0),
           Barcode: spRow.barcode || raw.Barcode || raw.barcode || '',
           Link_Foto: spRow.image_url || raw.Link_Foto || raw.imageUrl || raw.image || raw.URL_Produk || '',
+          Link_Foto2: (raw.Link_Foto2 || raw.image_url2 || raw.imageUrl2 || ''),
           Deskripsi: spRow.description || raw.Deskripsi || raw.description || '',
           warehouseId: raw.warehouseId || '',
           stockByWarehouse: raw.stockByWarehouse || {},
@@ -523,6 +527,7 @@ export default function EditProductPage() {
         Min_Grosir: Number(data.Min_Grosir || 1),
         weight: rawWeight,
         Link_Foto: data.Link_Foto || data.URL_Produk || data.image_url || data.imageUrl || data.image || '',
+        Link_Foto2: data.Link_Foto2 || data.image_url2 || data.imageUrl2 || '',
         Deskripsi: data.Deskripsi || data.description || '',
         Status: data.Status ?? 1,
         Supplier: data.Supplier || '',
@@ -542,6 +547,10 @@ export default function EditProductPage() {
       originalImageUrlRef.current = String(initialImg).trim();
       if (initialImg) {
         setImagePreview(initialImg);
+      }
+      const initialImg2 = data.Link_Foto2 || data.image_url2 || data.imageUrl2 || '';
+      if (initialImg2) {
+        setImagePreview2(initialImg2);
       }
 
       const ps = (data as any).pricingStrategy as PricingStrategy | undefined;
@@ -755,6 +764,16 @@ export default function EditProductPage() {
     } catch { toast.error("Gagal proses gambar"); }
   };
 
+  const handleImageChange2 = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressedFile = await imageCompression(file, { maxSizeMB: 0.25, maxWidthOrHeight: 800, useWebWorker: true, initialQuality: 0.7 });
+      setImageFile2(compressedFile);
+      setImagePreview2(URL.createObjectURL(compressedFile));
+    } catch { toast.error("Gagal proses gambar ke-2"); }
+  };
+
   const calculateProfit = (sellingPrice: number, costPrice: number) => {
     const profit = sellingPrice - costPrice;
     const percentage = costPrice > 0 ? (profit / costPrice) * 100 : 0;
@@ -803,6 +822,18 @@ export default function EditProductPage() {
           throw new Error(uploadRes.error || "Gagal mengupload gambar.");
         }
         finalImageUrl = uploadRes.url;
+      }
+
+      let finalImageUrl2 = formData.Link_Foto2;
+      if (imageFile2) {
+        const uploadData2 = new FormData();
+        uploadData2.append('file', imageFile2);
+        uploadData2.append('folder', 'products');
+        const uploadRes2 = await uploadImageAction(uploadData2);
+        if (!uploadRes2.success || !uploadRes2.url) {
+          throw new Error(uploadRes2.error || "Gagal mengupload gambar ke-2.");
+        }
+        finalImageUrl2 = uploadRes2.url;
       }
 
       const oldDoc = await sbGetDoc('products', id);
@@ -941,6 +972,9 @@ export default function EditProductPage() {
         imageUrl: finalImageUrl,
         image: finalImageUrl,
         URL_Produk: finalImageUrl,
+        Link_Foto2: finalImageUrl2,
+        imageUrl2: finalImageUrl2,
+        image_url2: finalImageUrl2,
         isActive: Number(formData.Status) === 1,
         Status: Number(formData.Status) === 1 ? 1 : 0,
         warehouseId: formData.warehouseId || oldData?.warehouseId || '',
@@ -2164,6 +2198,8 @@ export default function EditProductPage() {
                 </h3>
 
                 <div className="space-y-3">
+                  {/* --- FOTO 1 --- */}
+                  <p className="text-[10px] font-black uppercase text-slate-400">Foto Utama</p>
                   <div className="w-full aspect-square border-2 border-dashed border-slate-200 rounded-xl overflow-hidden relative flex items-center justify-center bg-slate-50">
                     {imagePreview ? (
                       <img
@@ -2178,6 +2214,27 @@ export default function EditProductPage() {
                         <span className="text-[11px] font-medium text-slate-400">Belum ada foto</span>
                       </div>
                     )}
+                  </div>
+
+                  {/* Input URL Foto 1 */}
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">URL Foto 1</label>
+                    <input
+                      type="text"
+                      placeholder="Paste link URL gambar (https://...)"
+                      className="w-full px-3 py-2 bg-slate-50/80 rounded-xl border border-slate-200 font-medium text-xs text-slate-800 outline-none focus:bg-white focus:border-blue-500 transition-all"
+                      value={formData.Link_Foto}
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        setFormData((prev) => ({ ...prev, Link_Foto: url }));
+                        if (url && (url.startsWith('http') || url.startsWith('/'))) {
+                          setImagePreview(url);
+                          setImageFile(null);
+                        } else if (!url) {
+                          setImagePreview(null);
+                        }
+                      }}
+                    />
                   </div>
 
                   <div className="flex gap-2">
@@ -2204,6 +2261,73 @@ export default function EditProductPage() {
                         <Trash2 size={14} />
                       </button>
                     )}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="border-t border-slate-100 pt-3">
+                    <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Foto Tambahan (Opsional)</p>
+                    <div className="w-full aspect-square border-2 border-dashed border-slate-200 rounded-xl overflow-hidden relative flex items-center justify-center bg-slate-50 mb-2">
+                      {imagePreview2 ? (
+                        <img
+                          src={imagePreview2}
+                          alt="Preview Produk 2"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/logo-atayatoko.png'; }}
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-1 text-slate-300">
+                          <ImageIcon size={28} />
+                          <span className="text-[11px] font-medium text-slate-400">Foto ke-2</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Input URL Foto 2 */}
+                    <div className="mb-2">
+                      <label className="text-[10px] font-bold uppercase text-slate-400 block mb-1">URL Foto 2</label>
+                      <input
+                        type="text"
+                        placeholder="Paste link URL gambar ke-2 (https://...)"
+                        className="w-full px-3 py-2 bg-slate-50/80 rounded-xl border border-slate-200 font-medium text-xs text-slate-800 outline-none focus:bg-white focus:border-blue-500 transition-all"
+                        value={formData.Link_Foto2}
+                        onChange={(e) => {
+                          const url = e.target.value;
+                          setFormData((prev) => ({ ...prev, Link_Foto2: url }));
+                          if (url && (url.startsWith('http') || url.startsWith('/'))) {
+                            setImagePreview2(url);
+                            setImageFile2(null);
+                          } else if (!url) {
+                            setImagePreview2(null);
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <label className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl cursor-pointer text-xs font-bold text-center transition-colors">
+                        Pilih Foto Ke-2
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageChange2}
+                        />
+                      </label>
+                      {imagePreview2 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setImageFile2(null);
+                            setImagePreview2(null);
+                            setFormData((prev) => ({ ...prev, Link_Foto2: '' }));
+                          }}
+                          className="p-2 text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl text-xs font-bold transition-colors"
+                          title="Hapus Foto Ke-2"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div>
