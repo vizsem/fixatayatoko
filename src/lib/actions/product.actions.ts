@@ -2903,10 +2903,11 @@ export async function mergeProductsAsVariantsAction(payload: {
   parentId: string;
   variantProductIds: string[];
   isParentOnly?: boolean;
+  prefixParentNameToVariants?: boolean;
 }): Promise<{ success: boolean; mergedCount?: number; error?: string }> {
   await requireAdmin();
   try {
-    const { parentId, variantProductIds, isParentOnly } = payload;
+    const { parentId, variantProductIds, isParentOnly, prefixParentNameToVariants = true } = payload;
     if (!parentId) return { success: false, error: 'Produk induk harus dipilih' };
     const validChildren = (variantProductIds || []).filter(id => id && id !== parentId);
     if (validChildren.length === 0) {
@@ -2957,21 +2958,40 @@ export async function mergeProductsAsVariantsAction(payload: {
 
     if (cErr) throw cErr;
 
-    // 4. Update masing-masing anak varian dengan Parent_ID
+    const parentName = String(parentProduct.name || parentRaw.Nama || parentRaw.name || '').trim();
+
+    // 4. Update masing-masing anak varian dengan Parent_ID dan sematkan nama induk di depan bila belum ada
     for (const child of (children || [])) {
       const childRaw = (child.raw_data && typeof child.raw_data === 'object') ? child.raw_data : {};
+      const currentChildName = String(child.name || childRaw.Nama || childRaw.name || '').trim();
+      let newChildName = currentChildName;
+
+      if (prefixParentNameToVariants && parentName && currentChildName) {
+        if (!currentChildName.toLowerCase().startsWith(parentName.toLowerCase())) {
+          newChildName = `${parentName} - ${currentChildName}`;
+        }
+      }
+
       const updatedChildRaw = {
         ...childRaw,
         Parent_ID: parentId,
+        parentId: parentId,
+        Nama: newChildName,
+        name: newChildName,
         updatedAt: now,
       };
 
+      const updateData: Record<string, any> = {
+        raw_data: updatedChildRaw,
+        updated_at: now,
+      };
+      if (newChildName !== currentChildName) {
+        updateData.name = newChildName;
+      }
+
       await supabaseAdmin
         .from('products')
-        .update({
-          raw_data: updatedChildRaw,
-          updated_at: now,
-        })
+        .update(updateData)
         .eq('id', child.id);
     }
 
@@ -2998,11 +3018,12 @@ export async function createParentAndAttachVariantsAction(payload: {
   category?: string;
   brand?: string;
   isParentOnly?: boolean;
+  prefixParentNameToVariants?: boolean;
   variantProductIds: string[];
 }): Promise<{ success: boolean; parentId?: string; parentName?: string; error?: string }> {
   await requireAdmin();
   try {
-    const { parentName, category, brand, isParentOnly = true, variantProductIds } = payload;
+    const { parentName, category, brand, isParentOnly = true, prefixParentNameToVariants = true, variantProductIds } = payload;
     if (!parentName || !parentName.trim()) {
       return { success: false, error: 'Nama produk induk harus diisi' };
     }
@@ -3089,22 +3110,38 @@ export async function createParentAndAttachVariantsAction(payload: {
       return { success: false, error: `Gagal membuat produk induk: ${insertErr.message}` };
     }
 
-    // 2. Hubungkan semua produk anak varian dengan Parent_ID
+    // 2. Hubungkan semua produk anak varian dengan Parent_ID dan sematkan nama induk di depan jika belum ada
     for (const child of children) {
       const childRaw = (child.raw_data && typeof child.raw_data === 'object') ? child.raw_data : {};
+      const currentChildName = String(child.name || childRaw.Nama || childRaw.name || '').trim();
+      let newChildName = currentChildName;
+
+      if (prefixParentNameToVariants && cleanParentName && currentChildName) {
+        if (!currentChildName.toLowerCase().startsWith(cleanParentName.toLowerCase())) {
+          newChildName = `${cleanParentName} - ${currentChildName}`;
+        }
+      }
+
       const updatedChildRaw = {
         ...childRaw,
         Parent_ID: parentId,
         parentId: parentId,
+        Nama: newChildName,
+        name: newChildName,
         updatedAt: now,
       };
 
+      const updateData: Record<string, any> = {
+        raw_data: updatedChildRaw,
+        updated_at: now,
+      };
+      if (newChildName !== currentChildName) {
+        updateData.name = newChildName;
+      }
+
       await supabaseAdmin
         .from('products')
-        .update({
-          raw_data: updatedChildRaw,
-          updated_at: now,
-        })
+        .update(updateData)
         .eq('id', child.id);
     }
 
@@ -3120,6 +3157,76 @@ export async function createParentAndAttachVariantsAction(payload: {
   } catch (err: any) {
     console.error('createParentAndAttachVariantsAction error:', err);
     return { success: false, error: err?.message || 'Gagal membuat produk induk' };
+  }
+}
+
+/**
+ * Sinkronkan nama produk induk di depan nama seluruh produk anak variannya.
+ * Jika varian belum diawali nama induk, format menjadi: `${parentName} - ${childName}`.
+ */
+export async function syncParentNameToChildrenAction(parentId: string): Promise<{
+  success: boolean;
+  updatedCount?: number;
+  error?: string;
+}> {
+  await requireAdmin();
+  try {
+    if (!parentId) return { success: false, error: 'Parent ID tidak valid' };
+
+    const { data: parent, error: pErr } = await supabaseAdmin
+      .from('products')
+      .select('name, raw_data')
+      .eq('id', parentId)
+      .single();
+
+    if (pErr || !parent) return { success: false, error: 'Produk induk tidak ditemukan' };
+
+    const parentName = String(parent.name || parent.raw_data?.Nama || parent.raw_data?.name || '').trim();
+    if (!parentName) return { success: false, error: 'Nama induk kosong' };
+
+    const { data: children, error: cErr } = await supabaseAdmin
+      .from('products')
+      .select('id, name, raw_data')
+      .eq('raw_data->>Parent_ID', parentId);
+
+    if (cErr) throw cErr;
+
+    let updatedCount = 0;
+    const now = new Date().toISOString();
+
+    for (const child of (children || [])) {
+      const childRaw = (child.raw_data && typeof child.raw_data === 'object') ? child.raw_data : {};
+      const currentChildName = String(child.name || childRaw.Nama || childRaw.name || '').trim();
+      if (!currentChildName) continue;
+
+      if (!currentChildName.toLowerCase().startsWith(parentName.toLowerCase())) {
+        const newName = `${parentName} - ${currentChildName}`;
+        const updatedRaw = {
+          ...childRaw,
+          Nama: newName,
+          name: newName,
+          updatedAt: now,
+        };
+
+        const { error: updErr } = await supabaseAdmin
+          .from('products')
+          .update({
+            name: newName,
+            raw_data: updatedRaw,
+            updated_at: now,
+          })
+          .eq('id', child.id);
+
+        if (!updErr) updatedCount++;
+      }
+    }
+
+    revalidatePath('/admin/products');
+    revalidatePath(`/admin/products/edit/${parentId}`);
+    return { success: true, updatedCount };
+  } catch (err: any) {
+    console.error('syncParentNameToChildrenAction error:', err);
+    return { success: false, error: err?.message || 'Gagal menyinkronkan nama varian' };
   }
 }
 

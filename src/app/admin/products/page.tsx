@@ -22,6 +22,7 @@ import {
   bulkMoveCategoryAction,
   getCategories,
   toggleParentOnlyAction,
+  syncParentNameToChildrenAction,
 } from '@/lib/actions/product.actions';
 
 
@@ -1126,6 +1127,25 @@ export default function AdminProducts() {
     }
   };
 
+  const handleSyncParentNameToChildren = async (product: ProductRow) => {
+    const pName = product.name || product.Nama;
+    const childCount = childrenByParent.get(product.id)?.length || 0;
+    if (!confirm(`Sematkan nama induk "${pName}" di depan nama seluruh ${childCount} varian yang belum diawali nama induk?`)) return;
+    const t = notify.admin.loading('Menyinkronkan nama varian...');
+    try {
+      const res = await syncParentNameToChildrenAction(product.id);
+      if (!res?.success) throw new Error(res?.error || 'Gagal menyinkronkan nama varian');
+      if (res.updatedCount && res.updatedCount > 0) {
+        notify.admin.success(`${res.updatedCount} varian berhasil disinkronkan namanya!`, { id: t });
+      } else {
+        notify.admin.success('Semua varian sudah memiliki nama induk di depannya.', { id: t });
+      }
+      setTimeout(() => window.location.reload(), 600);
+    } catch (error: any) {
+      notify.admin.error(error?.message || 'Gagal menyinkronkan nama varian', { id: t });
+    }
+  };
+
   // --- HANDLE SYNC & RESET ---
   const handleSync = () => {
     const t = notify.admin.loading("Mensinkronkan data...");
@@ -2014,6 +2034,14 @@ export default function AdminProducts() {
 
                       {expandedParents.has(p.id) && (
                         <div className="mt-2 space-y-2 pl-2 border-l-2 border-violet-300">
+                          <button
+                            type="button"
+                            onClick={() => handleSyncParentNameToChildren(p)}
+                            className="w-full text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 p-2 rounded-xl border border-indigo-200 transition-colors flex items-center justify-center gap-1.5"
+                          >
+                            <Sparkles size={11} className="text-indigo-600" />
+                            <span>Sinkronkan Nama Induk ke Varian</span>
+                          </button>
                           {childrenByParent.get(p.id)!.map((child) => (
                             <div key={child.id} className="p-2.5 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between gap-2">
                               <div className="min-w-0 flex-1">
@@ -2384,13 +2412,24 @@ export default function AdminProducts() {
                                 <Layers size={14} className="text-violet-600" />
                                 Daftar Varian Terhubung ({pChildren.length})
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedProductVariants(p)}
-                                className="text-[11px] font-black text-violet-700 hover:text-violet-900 flex items-center gap-1 transition-colors"
-                              >
-                                + Tambah Varian Baru
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSyncParentNameToChildren(p)}
+                                  className="text-[10px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200 transition-colors shadow-2xs flex items-center gap-1"
+                                  title="Sematkan nama induk di depan nama semua varian anak yang belum diawali nama induk"
+                                >
+                                  <Sparkles size={11} className="text-indigo-600" />
+                                  <span>Sinkronkan Nama Induk ke Varian</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedProductVariants(p)}
+                                  className="text-[11px] font-black text-violet-700 hover:text-violet-900 flex items-center gap-1 transition-colors"
+                                >
+                                  + Tambah Varian Baru
+                                </button>
+                              </div>
                             </div>
                             <div className="divide-y divide-gray-100">
                               {pChildren.map((child) => (

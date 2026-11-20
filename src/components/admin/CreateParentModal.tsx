@@ -70,6 +70,7 @@ export default function CreateParentModal({
   const [category, setCategory] = useState('');
   const [brand, setBrand] = useState('');
   const [isParentOnly, setIsParentOnly] = useState(true);
+  const [prefixParentName, setPrefixParentName] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [generatingSku, setGeneratingSku] = useState(false);
 
@@ -133,6 +134,7 @@ export default function CreateParentModal({
         category: category.trim() || undefined,
         brand: brand.trim() || undefined,
         isParentOnly,
+        prefixParentNameToVariants: prefixParentName,
         variantProductIds: selectedProducts.map((p) => p.id),
       });
 
@@ -265,6 +267,24 @@ export default function CreateParentModal({
             </div>
           </label>
 
+          {/* Opsi Otomatis Tambah Nama Induk ke Varian */}
+          <label className="flex items-start gap-3 p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-2xl cursor-pointer hover:bg-indigo-50 transition-colors">
+            <input
+              type="checkbox"
+              checked={prefixParentName}
+              onChange={(e) => setPrefixParentName(e.target.checked)}
+              className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-400 w-4 h-4 cursor-pointer"
+            />
+            <div className="text-xs">
+              <span className="font-bold text-indigo-950 block">
+                Tambahkan nama Induk di depan nama varian secara otomatis
+              </span>
+              <span className="text-indigo-700 font-medium">
+                Jika nama produk varian belum diawali nama induk, sistem otomatis menambahkan nama induk di depan (misal: &quot;{parentName.trim() || 'NAMA INDUK'} - {selectedProducts[0]?.name || selectedProducts[0]?.Nama || 'VARIAN'}&quot;).
+              </span>
+            </div>
+          </label>
+
           {/* Preview Produk Anak Varian */}
           <div className="pt-2 border-t border-slate-100">
             <div className="flex items-center justify-between mb-2">
@@ -274,20 +294,34 @@ export default function CreateParentModal({
               </span>
             </div>
             <div className="bg-slate-50/80 rounded-2xl border border-slate-200/80 p-2.5 divide-y divide-slate-100 max-h-40 overflow-y-auto">
-              {selectedProducts.map((p) => (
-                <div key={p.id} className="py-1.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2 text-xs">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <ArrowRight size={12} className="text-violet-500 shrink-0" />
-                    <span className="font-bold text-slate-800 truncate">{p.name || p.Nama}</span>
-                    {p.sku && (
-                      <span className="font-mono text-[9px] text-slate-400 shrink-0">#{p.sku}</span>
-                    )}
+              {selectedProducts.map((p) => {
+                const originalName = p.name || p.Nama || '';
+                const pTrim = parentName.trim();
+                const willPrefix = prefixParentName && pTrim && !originalName.toLowerCase().startsWith(pTrim.toLowerCase());
+                const targetName = willPrefix ? `${pTrim} - ${originalName}` : originalName;
+
+                return (
+                  <div key={p.id} className="py-1.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <ArrowRight size={12} className="text-violet-500 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-800 truncate block">{targetName}</span>
+                        {willPrefix && (
+                          <span className="text-[10px] text-indigo-600 font-semibold block">
+                            (Asal: {originalName})
+                          </span>
+                        )}
+                      </div>
+                      {p.sku && (
+                        <span className="font-mono text-[9px] text-slate-400 shrink-0">#{p.sku}</span>
+                      )}
+                    </div>
+                    <span className="text-slate-600 font-semibold shrink-0 text-[11px]">
+                      Stok: {p.stock} {p.unit || 'PCS'}
+                    </span>
                   </div>
-                  <span className="text-slate-600 font-semibold shrink-0 text-[11px]">
-                    Stok: {p.stock} {p.unit || 'PCS'}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

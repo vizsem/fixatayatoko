@@ -36,6 +36,7 @@ export default function MergeVariantsModal({
     return root ? root.id : (selectedProducts[0]?.id || '');
   });
   const [isParentOnly, setIsParentOnly] = useState(false);
+  const [prefixParentName, setPrefixParentName] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
   // Update selectedParentId bila daftar produk berubah
@@ -75,6 +76,7 @@ export default function MergeVariantsModal({
         parentId: selectedParentId,
         variantProductIds: variantProducts.map((p) => p.id),
         isParentOnly,
+        prefixParentNameToVariants: prefixParentName,
       });
 
       if (!res.success) {
@@ -232,6 +234,24 @@ export default function MergeVariantsModal({
             </div>
           </label>
 
+          {/* Opsi Tambahkan Nama Induk ke Varian */}
+          <label className="flex items-start gap-3 p-3.5 bg-indigo-50/60 rounded-2xl border border-indigo-200/80 cursor-pointer hover:bg-indigo-50 transition-colors">
+            <input
+              type="checkbox"
+              checked={prefixParentName}
+              onChange={(e) => setPrefixParentName(e.target.checked)}
+              className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-400 w-4 h-4 cursor-pointer"
+            />
+            <div className="text-xs">
+              <span className="font-bold text-indigo-950 block">
+                Tambahkan nama Induk di depan nama varian secara otomatis
+              </span>
+              <span className="text-indigo-700 font-medium">
+                Jika nama produk anak belum diawali nama induk, sistem otomatis menyematkan nama induk di depannya (misal: &quot;{parentProduct?.name || 'Induk'} - {variantProducts[0]?.name || 'Varian'}&quot;).
+              </span>
+            </div>
+          </label>
+
           {/* Langkah 2: Ringkasan Varian yang akan digabung */}
           {parentProduct && (
             <div className="space-y-3 pt-2 border-t border-slate-100">
@@ -246,22 +266,36 @@ export default function MergeVariantsModal({
               </div>
 
               <div className="bg-slate-50/80 rounded-2xl border border-slate-200/80 p-3 divide-y divide-slate-100 max-h-48 overflow-y-auto">
-                {variantProducts.map((v) => (
-                  <div key={v.id} className="py-2.5 first:pt-1 last:pb-1 flex items-center justify-between gap-3 text-xs">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <ArrowRight size={12} className="text-violet-500 flex-shrink-0" />
-                        <span className="font-bold text-slate-800 truncate">{v.name}</span>
-                        {v.sku && (
-                          <span className="text-[10px] font-mono text-slate-400">({v.sku})</span>
-                        )}
+                {variantProducts.map((v) => {
+                  const pName = parentProduct?.name || '';
+                  const vName = v.name || v.Nama || '';
+                  const willPrefix = prefixParentName && pName && !vName.toLowerCase().startsWith(pName.toLowerCase());
+                  const targetName = willPrefix ? `${pName} - ${vName}` : vName;
+
+                  return (
+                    <div key={v.id} className="py-2.5 first:pt-1 last:pb-1 flex items-center justify-between gap-3 text-xs">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <ArrowRight size={12} className="text-violet-500 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <span className="font-bold text-slate-800 truncate block">{targetName}</span>
+                            {willPrefix && (
+                              <span className="text-[10px] text-indigo-600 font-semibold block">
+                                (Asal: {vName})
+                              </span>
+                            )}
+                          </div>
+                          {v.sku && (
+                            <span className="text-[10px] font-mono text-slate-400 shrink-0">({v.sku})</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0 text-slate-600 font-semibold">
+                        {v.stock} {v.unit || 'PCS'} · Rp {(v.priceEcer || 0).toLocaleString('id-ID')}
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0 text-slate-600 font-semibold">
-                      {v.stock} {v.unit || 'PCS'} · Rp {(v.priceEcer || 0).toLocaleString('id-ID')}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
