@@ -11,7 +11,8 @@ export type ActivityType =
   | 'ORDER_REFUND' 
   | 'USER_ROLE_CHANGE'
   | 'BACKUP_CREATED'
-  | 'RESTORE_PERFORMED';
+  | 'RESTORE_PERFORMED'
+  | 'PRICE_CHANGE';
 
 export interface ActivityLog {
   id?: string;

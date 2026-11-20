@@ -51,13 +51,16 @@ export async function getDashboardStats() {
       });
     }
 
-    // Hitung low stock
+    // Hitung low stock, inStock, outOfStock
     let totalInventoryValue = 0;
     const allProducts = lowStockRes.data || [];
+    let inStockCount = 0;
+    let outOfStockCount = 0;
     const lowStockCount = allProducts.filter((p: any) => {
       const stock = Number(p.stock ?? p.raw_data?.stock ?? p.raw_data?.Stok ?? 0);
       const costPrice = Number(p.cost_price ?? p.raw_data?.costPrice ?? p.raw_data?.Modal ?? 0);
       totalInventoryValue += stock * costPrice;
+      if (stock > 0) inStockCount++; else outOfStockCount++;
       return stock <= 10;
     }).length;
 
@@ -230,6 +233,8 @@ export async function getDashboardStats() {
         monthlyNetProfit: monthlyProfit - monthlyExpenses,
         totalInventoryValue,
         totalProducts,
+        inStock: inStockCount,
+        outOfStock: outOfStockCount,
         lowStock: lowStockCount,
         deadStock: deadStockCount,
         warehouses: 1, // Minimal 1 gudang
@@ -244,7 +249,7 @@ export async function getDashboardStats() {
   } catch (error) {
     console.error('Failed to fetch dashboard stats:', error);
     return {
-      stats: { dailySales: 0, weeklySales: 0, monthlySales: 0, monthlyProfit: 0, monthlyProfitEstimasi: 0, monthlyItemsEstimasi: 0, monthlyNetProfit: 0, totalInventoryValue: 0, totalProducts: 0, lowStock: 0, deadStock: 0, warehouses: 0, users: 0, cancelledOrders: 0 },
+      stats: { dailySales: 0, weeklySales: 0, monthlySales: 0, monthlyProfit: 0, monthlyProfitEstimasi: 0, monthlyItemsEstimasi: 0, monthlyNetProfit: 0, totalInventoryValue: 0, totalProducts: 0, inStock: 0, outOfStock: 0, lowStock: 0, deadStock: 0, warehouses: 0, users: 0, cancelledOrders: 0 },
       recentOrders: [],
       topProducts: [],
       topCustomers: [],

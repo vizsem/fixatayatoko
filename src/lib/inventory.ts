@@ -105,6 +105,25 @@ export const addInventoryLog = async (logData: InventoryLogData, _batch?: any) =
 
     if (error) {
       console.error('Error adding inventory log in supabaseAdmin:', error);
+    } else if (logData.nextStock !== undefined && Number(logData.nextStock) <= 5 && logData.productId) {
+      // Notifikasi otomatis jika stok menipis (<= 5) atau habis
+      try {
+        const nextVal = Number(logData.nextStock);
+        const isOut = nextVal <= 0;
+        await supabaseAdmin.from('notifications').insert({
+          id: `notif_stock_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          title: isOut ? `⚠️ Stok Habis: ${logData.productName || 'Produk'}` : `⚡ Stok Menipis: ${logData.productName || 'Produk'} (Sisa ${nextVal})`,
+          body: `Stok produk ${logData.productName || logData.productId} saat ini tersisa ${nextVal}. Harap segera lakukan restock atau purchase order.`,
+          type: isOut ? 'danger' : 'warning',
+          category: 'Inventory',
+          userId: 'all',
+          created_at: now,
+          createdAt: now,
+          read: false
+        });
+      } catch (nErr) {
+        // Abaikan jika tabel notifikasi belum ada atau gagal
+      }
     }
     return { success: true, id };
   } catch (err) {

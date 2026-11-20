@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { 
   Activity, User, Clock, Shield, 
   Search, Filter, ChevronRight, AlertCircle,
-  FileText, Settings, UserPlus, Trash2, Database, RotateCcw
+  FileText, Settings, UserPlus, Trash2, Database, RotateCcw, Banknote
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
@@ -24,6 +24,7 @@ const TYPE_ICONS: Record<string, any> = {
   USER_ROLE_CHANGE: Shield,
   BACKUP_CREATED: Database,
   RESTORE_PERFORMED: RotateCcw,
+  PRICE_CHANGE: Banknote,
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -34,6 +35,7 @@ const TYPE_COLORS: Record<string, string> = {
   USER_ROLE_CHANGE: 'text-amber-600 bg-amber-50',
   BACKUP_CREATED: 'text-indigo-600 bg-indigo-50',
   RESTORE_PERFORMED: 'text-rose-600 bg-rose-50',
+  PRICE_CHANGE: 'text-emerald-600 bg-emerald-50',
 };
 
 export default function AuditLogsPage() {

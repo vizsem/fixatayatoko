@@ -92,6 +92,8 @@ export default function AdminDashboard() {
     monthlyItemsEstimasi: 0,
     totalInventoryValue: 0,
     totalProducts: 0,
+    inStock: 0,
+    outOfStock: 0,
     lowStock: 0,
     deadStock: 0,
     cancelledOrders: 0,
@@ -127,6 +129,8 @@ export default function AdminDashboard() {
         monthlyItemsEstimasi: data.stats.monthlyItemsEstimasi || 0,
         totalInventoryValue: data.stats.totalInventoryValue || 0,
         totalProducts: data.stats.totalProducts,
+        inStock: data.stats.inStock || 0,
+        outOfStock: data.stats.outOfStock || 0,
         lowStock: data.stats.lowStock,
         deadStock: data.stats.deadStock || 0,
         cancelledOrders: data.stats.cancelledOrders || 0,
@@ -235,6 +239,41 @@ export default function AdminDashboard() {
           color="text-purple-600"
           bg="bg-purple-50"
         />
+        <div className="bg-white p-3.5 md:p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between group hover:shadow-md transition-all h-full relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-3 md:p-4 opacity-10 -mr-4 -mt-4 transform rotate-12 group-hover:scale-125 transition-transform duration-500">
+            <Package size={70} className="fill-emerald-600" />
+          </div>
+          <div className="flex justify-between items-start mb-3 z-10">
+            <div className="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl shadow-inner">
+              <Package size={18} />
+            </div>
+          </div>
+          <div className="z-10 mt-2">
+            <p className="text-xl lg:text-2xl font-black text-gray-800 tracking-tight mb-0.5">{stats.inStock}</p>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider leading-tight">Stok Tersedia</p>
+          </div>
+        </div>
+        <Link href="/admin/products?filter=out_of_stock" className="block h-full">
+          <div className="bg-white p-3.5 md:p-5 rounded-2xl shadow-sm border border-rose-100 flex flex-col justify-between group hover:shadow-md transition-all h-full relative overflow-hidden cursor-pointer">
+            <div className="absolute top-0 right-0 p-3 md:p-4 opacity-10 -mr-4 -mt-4 transform rotate-12 group-hover:scale-125 transition-transform duration-500">
+              <ArchiveX size={70} className="fill-rose-600" />
+            </div>
+            <div className="flex justify-between items-start mb-3 z-10">
+              <div className="bg-rose-50 text-rose-600 p-2.5 rounded-xl shadow-inner">
+                <ArchiveX size={18} />
+              </div>
+              {stats.outOfStock > 0 && (
+                <span className="bg-rose-50 text-rose-600 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                  <ArrowUpRight size={10} /> Lihat
+                </span>
+              )}
+            </div>
+            <div className="z-10 mt-2">
+              <p className="text-xl lg:text-2xl font-black text-rose-600 tracking-tight mb-0.5">{stats.outOfStock}</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider leading-tight">Stok Habis</p>
+            </div>
+          </div>
+        </Link>
         <StatBox
           label="Stok Perhatian"
           value={stats.lowStock}

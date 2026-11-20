@@ -16,6 +16,7 @@ import {
   updateProductStatus,
   restockProductViaSupabase,
   duplicateProduct,
+  duplicateProductWithVariantsAction,
   detachVariantAction,
   bulkUpdatePreOrderAction,
   bulkMoveCategoryAction,
@@ -369,8 +370,18 @@ export default function AdminProducts() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt' | 'name'>('createdAt');
-  const [quickFilter, setQuickFilter] = useState<'all' | 'in_stock' | 'out_of_stock' | 'low_stock' | 'no_image' | 'no_cost'>('all');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'in_stock' | 'out_of_stock' | 'low_stock' | 'no_image' | 'no_cost' | 'pre_order'>('all');
   const [dbCounts, setDbCounts] = useState<{ active: number; inactive: number }>({ active: 0, inactive: 0 });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const filterParam = params.get('filter');
+      if (filterParam === 'out_of_stock' || filterParam === 'low_stock' || filterParam === 'in_stock' || filterParam === 'pre_order') {
+        setQuickFilter(filterParam as any);
+      }
+    }
+  }, []);
 
   // State untuk Hierarki Varian & Merge Varian
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -781,6 +792,8 @@ export default function AdminProducts() {
       filtered = filtered.filter(p => !p.imageUrl && !p.image && !p.foto && !p.URL_Produk);
     } else if (quickFilter === 'no_cost') {
       filtered = filtered.filter(p => Number(p.purchasePrice || p.Modal || 0) <= 0);
+    } else if (quickFilter === 'pre_order') {
+      filtered = filtered.filter(p => Boolean((p as any).isPreOrder || (p as any).preOrder || (p as any).is_pre_order));
     }
 
     // Filter mode hierarki varian
@@ -806,6 +819,7 @@ export default function AdminProducts() {
     let lowStock = 0;
     let noImage = 0;
     let noCost = 0;
+    let preOrder = 0;
     rows.forEach(p => {
       const stock = Number(p.stock || p.Stok || 0);
       const min = Number(p.minStock || p.Min_Stok || 5);
@@ -816,8 +830,9 @@ export default function AdminProducts() {
       else { inStock++; if (stock <= min) lowStock++; }
       if (!hasImage) noImage++;
       if (cost <= 0) noCost++;
+      if (Boolean((p as any).isPreOrder || (p as any).preOrder || (p as any).is_pre_order)) preOrder++;
     });
-    return { inStock, outOfStock, lowStock, noImage, noCost };
+    return { inStock, outOfStock, lowStock, noImage, noCost, preOrder };
   }, [rows]);
 
   const stats = useMemo(() => {
@@ -854,7 +869,9 @@ export default function AdminProducts() {
       warehouseId: p.warehouseId || '',
         Gudang_Nama: displayWarehouses.find(w => w.id === p.warehouseId)?.name || '-',
       tgl_masuk: p.tgl_masuk || '',
-      expired_date: p.expired_date || ''
+      expired_date: p.expired_date || '',
+      Pre_Order: Boolean((p as any).isPreOrder || (p as any).preOrder || (p as any).is_pre_order) ? 'Ya' : 'Tidak',
+      Status_Stok: Number(p.stock || p.Stok || 0) > 0 ? 'Tersedia' : 'Habis',
     }));
       // `xlsx` (SheetJS) ±400 KB dan hanya dipakai saat tombol ini ditekan.
       // Impor statis membuat halaman produk mengunduhnya sebelum bisa tampil.
@@ -1060,6 +1077,23 @@ export default function AdminProducts() {
       setTimeout(() => window.location.reload(), 800);
     } catch (error: any) {
       notify.admin.error(error?.message || 'Gagal menduplikasi produk', { id: t });
+    } finally {
+      setDuplicatingId(null);
+    }
+  };
+
+  const handleDuplicateWithVariants = async (product: ProductRow) => {
+    const childCount = childrenByParent.get(product.id)?.length || 0;
+    if (!confirm(`Duplikat produk induk "${product.name || product.Nama}" beserta seluruh ${childCount} variannya? Produk baru akan dibuat dengan stok 0.`)) return;
+    setDuplicatingId(product.id);
+    const t = notify.admin.loading('Menduplikasi produk induk & seluruh variannya...');
+    try {
+      const res = await duplicateProductWithVariantsAction(product.id);
+      if (!res?.success) throw new Error(res?.error || 'Gagal menduplikasi produk induk & varian');
+      notify.admin.success('Produk induk & varian berhasil diduplikasi!', { id: t });
+      setTimeout(() => window.location.reload(), 800);
+    } catch (error: any) {
+      notify.admin.error(error?.message || 'Gagal menduplikasi produk beserta varian', { id: t });
     } finally {
       setDuplicatingId(null);
     }
@@ -1291,6 +1325,45 @@ export default function AdminProducts() {
           </div>
         </div>
       </div>
+
+      {/* ALERT BANNER STOK MENIPIS / HABIS */}
+      {(quickCounts.outOfStock > 0 || quickCounts.lowStock > 0) && (
+        <div className="bg-amber-50/80 border border-amber-200/90 rounded-2xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-amber-500 text-white rounded-xl shadow-xs shrink-0">
+              <AlertTriangle size={16} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-amber-950">
+                Pemberitahuan Stok Perhatian
+              </p>
+              <p className="text-[11px] text-amber-800 font-medium">
+                Terdapat <span className="font-bold text-rose-700">{quickCounts.outOfStock} produk habis</span> dan <span className="font-bold text-amber-700">{quickCounts.lowStock} produk menipis</span> di bawah batas minimum.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {quickCounts.outOfStock > 0 && (
+              <button
+                type="button"
+                onClick={() => { setQuickFilter('out_of_stock'); setCurrentPage(1); }}
+                className="px-2.5 py-1 text-xs font-bold rounded-lg bg-rose-600 text-white hover:bg-rose-700 transition-colors shadow-2xs"
+              >
+                Lihat Stok Habis
+              </button>
+            )}
+            {quickCounts.lowStock > 0 && (
+              <button
+                type="button"
+                onClick={() => { setQuickFilter('low_stock'); setCurrentPage(1); }}
+                className="px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow-2xs"
+              >
+                Lihat Stok Menipis
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* TABLE BOX */}
       <div className="bg-white rounded-2xl shadow-xs border border-gray-200/80 overflow-hidden">
@@ -1660,6 +1733,31 @@ export default function AdminProducts() {
                 {quickCounts.noCost}
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => { setQuickFilter(quickFilter === 'pre_order' ? 'all' : 'pre_order'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                quickFilter === 'pre_order' ? 'bg-indigo-600 text-white shadow-xs' : 'bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50'
+              }`}
+            >
+              <Clock size={12} />
+              <span>Pre-Order</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${quickFilter === 'pre_order' ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
+                {quickCounts.preOrder}
+              </span>
+            </button>
+
+            {(quickFilter !== 'all' || searchTerm !== '') && (
+              <button
+                type="button"
+                onClick={() => { setQuickFilter('all'); setSearchTerm(''); setCurrentPage(1); }}
+                className="px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 bg-slate-800 text-white hover:bg-slate-700"
+              >
+                <X size={12} />
+                <span>Reset Filter</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1855,6 +1953,17 @@ export default function AdminProducts() {
                             <Copy size={13} className="text-sky-500" />
                             <span>Duplikat Produk</span>
                           </button>
+                          {(childrenByParent.get(p.id)?.length || 0) > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => { setActiveActionMenuId(null); handleDuplicateWithVariants(p); }}
+                              disabled={duplicatingId === p.id}
+                              className="w-full flex items-center gap-2 px-2.5 py-2 text-xs font-bold text-violet-700 hover:bg-violet-50 rounded-xl transition-colors disabled:opacity-50"
+                            >
+                              <Layers size={13} className="text-violet-600" />
+                              <span>Duplikat + Varian ({childrenByParent.get(p.id)?.length})</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => { setActiveActionMenuId(null); handleArchive(p, p.isActive !== false); }}
@@ -2223,6 +2332,17 @@ export default function AdminProducts() {
                                 {duplicatingId === p.id ? <RefreshCw size={13} className="animate-spin text-sky-500" /> : <Copy size={13} className="text-sky-500" />}
                                 <span>Duplikat Produk</span>
                               </button>
+                              {(childrenByParent.get(p.id)?.length || 0) > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setActiveActionMenuId(null); handleDuplicateWithVariants(p); }}
+                                  disabled={duplicatingId === p.id}
+                                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-50 rounded-xl transition-colors disabled:opacity-50"
+                                >
+                                  {duplicatingId === p.id ? <RefreshCw size={13} className="animate-spin text-violet-600" /> : <Layers size={13} className="text-violet-600" />}
+                                  <span>Duplikat + Varian ({childrenByParent.get(p.id)?.length})</span>
+                                </button>
+                              )}
                               <button 
                                 type="button"
                                 onClick={() => { setActiveActionMenuId(null); handleArchive(p, p.isActive !== false); }} 

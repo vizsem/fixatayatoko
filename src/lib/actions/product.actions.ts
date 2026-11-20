@@ -1241,6 +1241,115 @@ export async function duplicateProduct(id: string) {
 }
 
 /**
+ * Duplikasi produk induk beserta seluruh anak variannya.
+ * Produk induk baru akan diberi nama "[DUPLIKAT] <nama asli>".
+ * Setiap anak varian diduplikasi dan dihubungkan ke induk duplikat baru.
+ */
+export async function duplicateProductWithVariantsAction(parentId: string): Promise<{
+  success: boolean;
+  newParentId?: string;
+  error?: string;
+}> {
+  await requireAdmin();
+  try {
+    if (!parentId) return { success: false, error: 'Parent ID tidak valid' };
+
+    // Fetch produk induk
+    const { data: parent, error: parentErr } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('id', parentId)
+      .single();
+    if (parentErr || !parent) throw new Error('Produk induk tidak ditemukan');
+
+    // Fetch semua varian anak (child products)
+    const { data: variants, error: variantsErr } = await supabaseAdmin
+      .from('products')
+      .select('*')
+      .eq('raw_data->>Parent_ID', parentId);
+    if (variantsErr) throw variantsErr;
+
+    const now = new Date().toISOString();
+    const newParentId = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+    // Buat nama induk baru
+    const baseName = parent.name || 'Produk';
+    const newParentName = baseName.startsWith('[DUPLIKAT]') ? baseName : `[DUPLIKAT] ${baseName}`;
+    const newParentSku = `${parent.sku || newParentId}-DUP-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+
+    const parentRawData = {
+      ...(parent.raw_data || {}),
+      name: newParentName,
+      sku: newParentSku,
+      stock: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Insert produk induk duplikat
+    const { error: parentInsertErr } = await supabaseAdmin.from('products').insert({
+      id: newParentId,
+      name: newParentName,
+      sku: newParentSku,
+      description: parent.description,
+      price: parent.price,
+      cost_price: parent.cost_price,
+      category: parent.category,
+      unit: parent.unit,
+      stock: 0,
+      barcode: null,
+      is_active: true,
+      raw_data: parentRawData,
+      created_at: now,
+      updated_at: now,
+    });
+    if (parentInsertErr) throw parentInsertErr;
+
+    // Duplikasi setiap varian anak dan hubungkan ke induk baru
+    const childInserts: any[] = (variants || []).map((v: any) => {
+      const childId = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const childSku = `${v.sku || childId}-DUP-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+      const childRawData = {
+        ...(v.raw_data || {}),
+        Parent_ID: newParentId,
+        parentId: newParentId,
+        sku: childSku,
+        stock: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+      return {
+        id: childId,
+        name: v.name,
+        sku: childSku,
+        description: v.description,
+        price: v.price,
+        cost_price: v.cost_price,
+        category: v.category,
+        unit: v.unit,
+        stock: 0,
+        barcode: null,
+        is_active: true,
+        raw_data: childRawData,
+        created_at: now,
+        updated_at: now,
+      };
+    });
+
+    if (childInserts.length > 0) {
+      const { error: childInsertErr } = await supabaseAdmin.from('products').insert(childInserts);
+      if (childInsertErr) throw childInsertErr;
+    }
+
+    revalidatePath('/admin/products');
+    return { success: true, newParentId };
+  } catch (err: any) {
+    console.error('duplicateProductWithVariantsAction error:', err);
+    return { success: false, error: err?.message || 'Gagal menduplikasi produk dengan varian' };
+  }
+}
+
+/**
  * Update harga modal (HPP), harga jual ecer, harga grosir, dan min qty grosir sebuah produk.
  * Digunakan dari Quick Update Harga modal di halaman Struktur HPP.
  * Wajib dijalankan sebagai Server Action agar supabaseAdmin bisa diakses dengan aman.
@@ -1334,6 +1443,32 @@ export async function updateProductPrice(payload: {
       .eq('id', productId);
 
     if (updateErr) throw updateErr;
+
+    // Catat log perubahan harga ke activity_logs jika harga/HPP berubah
+    if (costChanged || Number(currentProd?.price || 0) !== newPrice) {
+      try {
+        await supabaseAdmin.from('activity_logs').insert({
+          type: 'PRICE_CHANGE',
+          admin_id: 'admin',
+          admin_name: 'Admin',
+          target_id: productId,
+          target_name: existingRaw.name || existingRaw.Nama || productId,
+          description: `Harga Ecer: Rp${Number(currentProd?.price || 0).toLocaleString('id-ID')} → Rp${newPrice.toLocaleString('id-ID')} (HPP: Rp${Number(currentProd?.cost_price || 0).toLocaleString('id-ID')} → Rp${newCost.toLocaleString('id-ID')})`,
+          metadata: {
+            oldPrice: Number(currentProd?.price || 0),
+            newPrice,
+            oldCost: Number(currentProd?.cost_price || 0),
+            newCost,
+            newGrosir,
+            newMinGrosir,
+            newSemiGrosir,
+          },
+          created_at: now,
+        });
+      } catch (logErr) {
+        console.error('Gagal mencatat audit log perubahan harga:', logErr);
+      }
+    }
 
     revalidatePath('/admin/products/pricing-hpp');
     revalidatePath('/admin/inventory');
