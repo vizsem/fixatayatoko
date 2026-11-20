@@ -435,14 +435,14 @@ export default function EditProductPage() {
   const fetchCostHistory = useCallback(async () => {
     try {
       const snap = await sbGetDocs({
-        table: 'cost_history',
+        table: 'product_cost_logs',
         where: [{ field: 'productId', op: '==', val: id }],
         limit: 10
       });
       if (snap.docs.length > 0) {
         const sorted = snap.docs
           .map(d => ({ id: d.id, ...d.data() } as any))
-          .sort((a, b) => (b.changeDate?.seconds || 0) - (a.changeDate?.seconds || 0));
+          .sort((a, b) => new Date(b.created_at || b.changeDate || 0).getTime() - new Date(a.created_at || a.changeDate || 0).getTime());
         setCostHistory(sorted);
       }
     } catch { /* ignore */ }
@@ -838,18 +838,7 @@ export default function EditProductPage() {
 
       const oldDoc = await sbGetDoc('products', id);
       const oldData = oldDoc.exists() ? oldDoc.data() : null;
-      const oldCost = Number(oldData?.Modal || oldData?.cost_price || 0);
       const oldStocks = oldData?.stockByWarehouse || {};
-
-      if (oldCost !== Number(formData.Modal)) {
-        await sbInsertDoc('cost_history', {
-          productId: id,
-          oldCost: oldCost,
-          newCost: Number(formData.Modal),
-          changeDate: new Date(),
-          adminEmail: (await supabase.auth.getUser()).data.user?.email || 'admin'
-        });
-      }
 
       const baseUnit = String(formData.Satuan || 'PCS').trim().toUpperCase();
 
