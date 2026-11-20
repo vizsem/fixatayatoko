@@ -2939,7 +2939,6 @@ export async function createParentAndAttachVariantsAction(payload: {
       name: cleanParentName,
       sku: cleanSku,
       category: finalCategory,
-      brand: finalBrand || null,
       unit: baseUnit,
       price: 0,
       cost_price: 0,
@@ -2961,6 +2960,7 @@ export async function createParentAndAttachVariantsAction(payload: {
       const updatedChildRaw = {
         ...childRaw,
         Parent_ID: parentId,
+        parentId: parentId,
         updatedAt: now,
       };
 
