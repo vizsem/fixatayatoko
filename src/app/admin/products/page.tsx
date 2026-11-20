@@ -30,7 +30,7 @@ import {
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight, ChevronDown,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
   CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers, UploadCloud,
-  Unlink, CornerDownRight, MoreVertical, AlertCircle, Sparkles, Filter, ChevronUp, Tag, Clock, FolderInput, Barcode
+  Unlink, CornerDownRight, MoreVertical, AlertCircle, Sparkles, Filter, ChevronUp, Tag, Clock, FolderInput, Barcode, PackageCheck
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
@@ -369,7 +369,7 @@ export default function AdminProducts() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt' | 'name'>('createdAt');
-  const [quickFilter, setQuickFilter] = useState<'all' | 'out_of_stock' | 'low_stock' | 'no_image' | 'no_cost'>('all');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'in_stock' | 'out_of_stock' | 'low_stock' | 'no_image' | 'no_cost'>('all');
   const [dbCounts, setDbCounts] = useState<{ active: number; inactive: number }>({ active: 0, inactive: 0 });
 
   // State untuk Hierarki Varian & Merge Varian
@@ -767,7 +767,9 @@ export default function AdminProducts() {
     }
 
     let filtered = result.filter((p) => (showInactive ? p.isActive === false : p.isActive !== false));
-    if (quickFilter === 'out_of_stock') {
+    if (quickFilter === 'in_stock') {
+      filtered = filtered.filter(p => Number(p.stock || p.Stok || 0) > 0);
+    } else if (quickFilter === 'out_of_stock') {
       filtered = filtered.filter(p => Number(p.stock || p.Stok || 0) <= 0);
     } else if (quickFilter === 'low_stock') {
       filtered = filtered.filter(p => {
@@ -799,6 +801,7 @@ export default function AdminProducts() {
   }, [rows, searchTerm, showInactive, quickFilter, viewHierarchy, childrenByParent]);
 
   const quickCounts = useMemo(() => {
+    let inStock = 0;
     let outOfStock = 0;
     let lowStock = 0;
     let noImage = 0;
@@ -810,11 +813,11 @@ export default function AdminProducts() {
       const hasImage = Boolean(p.imageUrl || p.image || p.foto || p.URL_Produk);
 
       if (stock <= 0) outOfStock++;
-      else if (stock <= min) lowStock++;
+      else { inStock++; if (stock <= min) lowStock++; }
       if (!hasImage) noImage++;
       if (cost <= 0) noCost++;
     });
-    return { outOfStock, lowStock, noImage, noCost };
+    return { inStock, outOfStock, lowStock, noImage, noCost };
   }, [rows]);
 
   const stats = useMemo(() => {
@@ -1576,6 +1579,22 @@ export default function AdminProducts() {
             >
               <span>Semua</span>
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${quickFilter === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600'}`}>{rows.length}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setQuickFilter(quickFilter === 'in_stock' ? 'all' : 'in_stock'); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                quickFilter === 'in_stock'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-white text-emerald-600 border border-emerald-200 hover:bg-emerald-50'
+              }`}
+            >
+              <PackageCheck size={12} />
+              <span>Stok Tersedia</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${quickFilter === 'in_stock' ? 'bg-emerald-700 text-white' : 'bg-emerald-100 text-emerald-700'}`}>
+                {quickCounts.inStock}
+              </span>
             </button>
 
             <button
