@@ -23,12 +23,13 @@ import {
   getCategories,
   toggleParentOnlyAction,
   syncParentNameToChildrenAction,
+  updateProduct,
 } from '@/lib/actions/product.actions';
 
 
 import Link from 'next/link';
 import {
-  Plus, Minus, Edit, Trash2, Download, Upload, Search, X,
+  Plus, Minus, Edit, Trash2, Download, Upload, Search, X, Check,
   Camera, Warehouse, Calculator, Eye, EyeOff, ChevronLeft, ChevronRight, ChevronDown,
   FileSpreadsheet, AlertTriangle, Package, Banknote, RefreshCw,
   CheckSquare, Printer, Square, Archive, RotateCcw, Copy, Layers, UploadCloud,
@@ -36,6 +37,7 @@ import {
 } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
+import { logActivity } from '@/lib/activity';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import UnfoundBarcodeModal from '@/components/scanner/UnfoundBarcodeModal';
 import QuickVariantModal from '@/components/admin/QuickVariantModal';
@@ -407,6 +409,97 @@ export default function AdminProducts() {
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
   const [showImportExportMenu, setShowImportExportMenu] = useState(false);
 
+  // States untuk Quick Edit (Inline edit nama & harga jual)
+  const [editingCell, setEditingCell] = useState<{ id: string; field: 'name' | 'price' } | null>(null);
+  const [editingValue, setEditingValue] = useState('');
+  const [savingCell, setSavingCell] = useState<string | null>(null);
+  const [localOverrides, setLocalOverrides] = useState<Record<string, { name?: string; priceEcer?: number }>>({});
+
+  const handleStartInlineEdit = (id: string, field: 'name' | 'price', currentVal: string | number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setEditingCell({ id, field });
+    if (field === 'price') {
+      const num = Number(currentVal || 0);
+      setEditingValue(num > 0 ? num.toLocaleString('id-ID') : '');
+    } else {
+      setEditingValue(String(currentVal ?? ''));
+    }
+  };
+
+  const handleCancelInlineEdit = (e?: React.MouseEvent | React.KeyboardEvent) => {
+    e?.stopPropagation();
+    setEditingCell(null);
+    setEditingValue('');
+  };
+
+  const handleSaveInlineEdit = async (product: { id: string; name: string; priceEcer?: number }, field: 'name' | 'price') => {
+    const val = editingValue.trim();
+    if (field === 'name' && !val) {
+      notify.admin.error('Nama produk tidak boleh kosong');
+      return;
+    }
+
+    const oldName = product.name;
+    const oldPrice = Number(product.priceEcer || 0);
+    const newPrice = field === 'price' ? Math.max(0, parseInt(val.replace(/[^0-9]/g, ''), 10) || 0) : 0;
+
+    if (field === 'name' && val === oldName) {
+      setEditingCell(null);
+      return;
+    }
+    if (field === 'price' && newPrice === oldPrice) {
+      setEditingCell(null);
+      return;
+    }
+
+    setSavingCell(product.id);
+    // Optimistic update
+    setLocalOverrides(prev => ({
+      ...prev,
+      [product.id]: {
+        ...prev[product.id],
+        ...(field === 'name' ? { name: val } : { priceEcer: newPrice })
+      }
+    }));
+
+    try {
+      const payload: any = field === 'name' ? { name: val } : { sellPrice: newPrice };
+      const res = await updateProduct(product.id, payload);
+      if (!res?.success) throw new Error(res?.error || 'Gagal menyimpan perubahan');
+
+      if (field === 'price') {
+        notify.admin.success(`Harga berhasil diubah jadi Rp${newPrice.toLocaleString('id-ID')}`);
+        logActivity({
+          type: 'PRICE_CHANGE',
+          targetId: product.id,
+          targetName: product.name,
+          description: `Edit cepat harga: Rp${oldPrice.toLocaleString('id-ID')} -> Rp${newPrice.toLocaleString('id-ID')}`,
+          metadata: { oldPrice, newPrice, source: 'inline_quick_edit' }
+        }).catch(() => {});
+      } else {
+        notify.admin.success('Nama produk berhasil diperbarui!');
+        logActivity({
+          type: 'PRODUCT_UPDATE',
+          targetId: product.id,
+          targetName: val,
+          description: `Edit cepat nama: "${oldName}" -> "${val}"`,
+          metadata: { oldName, newName: val, source: 'inline_quick_edit' }
+        }).catch(() => {});
+      }
+    } catch (err: any) {
+      setLocalOverrides(prev => {
+        const copy = { ...prev };
+        delete copy[product.id];
+        return copy;
+      });
+      notify.admin.error(err?.message || 'Gagal menyimpan');
+    } finally {
+      setSavingCell(null);
+      setEditingCell(null);
+      setEditingValue('');
+    }
+  };
+
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -559,13 +652,19 @@ export default function AdminProducts() {
     return (liveProducts || []).map((p: any) => {
       const parentId = (p.parentId || p.Parent_ID || p.parent_id || p.raw_data?.Parent_ID || p.raw_data?.parent_id || p.raw_data?.parentId || '').toString().trim() || undefined;
       const brand = (p.brand || p.Brand || p.raw_data?.brand || p.raw_data?.Brand || p.raw_data?.merek || p.raw_data?.Merek || '').toString().trim() || undefined;
+      const override = localOverrides[p.id];
+      const overriddenName = override?.name !== undefined ? override.name : p.name;
+      const overriddenPrice = override?.priceEcer !== undefined ? override.priceEcer : p.priceEcer;
       return {
         ...p,
+        name: overriddenName,
+        priceEcer: overriddenPrice,
+        price: overriddenPrice ?? p.price,
         parentId,
         brand: brand || p.brand,
       } as ProductRow;
     });
-  }, [liveProducts]);
+  }, [liveProducts, localOverrides]);
 
   const displayWarehouses = useMemo(() => {
     const base = warehouses;
@@ -1838,7 +1937,48 @@ export default function AdminProducts() {
                           </span>
                         )}
                       </div>
-                      <h3 className="font-bold text-gray-900 text-sm leading-tight tracking-tight line-clamp-2">{formatProductName(p.name)}</h3>
+                      {editingCell?.id === p.id && editingCell.field === 'name' ? (
+                        <div className="flex items-center gap-1.5 py-0.5" onClick={e => e.stopPropagation()}>
+                          <input
+                            autoFocus
+                            type="text"
+                            value={editingValue}
+                            onChange={e => setEditingValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleSaveInlineEdit(p, 'name');
+                              if (e.key === 'Escape') handleCancelInlineEdit(e);
+                            }}
+                            className="border border-violet-400 bg-white rounded-lg px-2 py-1 text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-violet-400 w-full"
+                            placeholder="Nama produk..."
+                          />
+                          <button
+                            type="button"
+                            disabled={savingCell === p.id}
+                            onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(p, 'name'); }}
+                            className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs shrink-0"
+                            title="Simpan (Enter)"
+                          >
+                            {savingCell === p.id ? <RefreshCw size={11} className="animate-spin" /> : <Check size={11} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleCancelInlineEdit(e); }}
+                            className="p-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors shrink-0"
+                            title="Batal (Esc)"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={(e) => handleStartInlineEdit(p.id, 'name', p.name, e)}
+                          className="group/mpname inline-flex items-center gap-1 cursor-pointer hover:bg-violet-50 rounded px-1 -ml-1 py-0.5 transition-colors"
+                          title="Klik untuk edit cepat nama produk"
+                        >
+                          <h3 className="font-bold text-gray-900 text-sm leading-tight tracking-tight line-clamp-2 group-hover/mpname:text-violet-700">{formatProductName(p.name)}</h3>
+                          <Edit size={10} className="text-gray-400 opacity-0 group-hover/mpname:opacity-100 transition-opacity text-violet-600 shrink-0" />
+                        </div>
+                      )}
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">{p.category || 'GENERAL'}</span>
                         {p.brand && (
@@ -1898,11 +2038,65 @@ export default function AdminProducts() {
                     </div>
                     <div className="space-y-0.5 text-right">
                       <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Sell Price</p>
-                      <p className="text-xs font-black text-emerald-600 leading-none tabular-nums">
-                        <span className="text-xs mr-0.5">Rp</span>
-                        {minPrice.toLocaleString('id-ID')}
-                        {hasVariants && minPrice !== maxPrice ? ` - ${maxPrice.toLocaleString('id-ID')}` : ''}
-                      </p>
+                      {!hasVariants ? (
+                        editingCell?.id === p.id && editingCell.field === 'price' ? (
+                          <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                            <div className="relative">
+                              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">Rp</span>
+                              <input
+                                autoFocus
+                                type="text"
+                                value={editingValue}
+                                onChange={e => {
+                                  const num = e.target.value.replace(/[^0-9]/g, '');
+                                  setEditingValue(num ? parseInt(num, 10).toLocaleString('id-ID') : '');
+                                }}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleSaveInlineEdit(p, 'price');
+                                  if (e.key === 'Escape') handleCancelInlineEdit(e);
+                                }}
+                                className="w-20 pl-5 pr-1 py-0.5 text-right text-xs font-bold text-emerald-700 border border-emerald-400 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                                placeholder="0"
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              disabled={savingCell === p.id}
+                              onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(p, 'price'); }}
+                              className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                              title="Simpan (Enter)"
+                            >
+                              {savingCell === p.id ? <RefreshCw size={10} className="animate-spin" /> : <Check size={10} />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleCancelInlineEdit(e); }}
+                              className="p-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                              title="Batal (Esc)"
+                            >
+                              <X size={10} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={(e) => handleStartInlineEdit(p.id, 'price', p.priceEcer || 0, e)}
+                            className="group/mpprice inline-flex items-center justify-end gap-1 cursor-pointer hover:bg-emerald-50 rounded px-1 -mr-1 py-0.5 transition-colors"
+                            title="Klik untuk edit cepat harga"
+                          >
+                            <p className="text-xs font-black text-emerald-600 leading-none tabular-nums group-hover/mpprice:text-emerald-700">
+                              <span className="text-xs mr-0.5">Rp</span>
+                              {Number(p.priceEcer || 0).toLocaleString('id-ID')}
+                            </p>
+                            <Edit size={10} className="text-gray-400 opacity-0 group-hover/mpprice:opacity-100 transition-opacity text-emerald-600" />
+                          </div>
+                        )
+                      ) : (
+                        <p className="text-xs font-black text-emerald-600 leading-none tabular-nums">
+                          <span className="text-xs mr-0.5">Rp</span>
+                          {minPrice.toLocaleString('id-ID')}
+                          {minPrice !== maxPrice ? ` - ${maxPrice.toLocaleString('id-ID')}` : ''}
+                        </p>
+                      )}
                       <p className="text-xs font-bold text-blue-500/70 italic mt-0.5">
                         Avg: Rp{minCost.toLocaleString('id-ID')}
                         {hasVariants && minCost !== maxCost ? ` - ${maxCost.toLocaleString('id-ID')}` : ''}
@@ -2049,10 +2243,98 @@ export default function AdminProducts() {
                                   <span className="text-[10px] font-black text-violet-600 uppercase">#{child.sku || 'N/A'}</span>
                                   {child.barcode && <span className="text-[10px] text-gray-400 font-mono">[{child.barcode}]</span>}
                                 </div>
-                                <p className="text-xs font-bold text-gray-900 truncate">{child.name}</p>
-                                <div className="flex items-center gap-3 mt-1 text-[11px]">
+                                {editingCell?.id === child.id && editingCell.field === 'name' ? (
+                                  <div className="flex items-center gap-1.5 py-0.5" onClick={e => e.stopPropagation()}>
+                                    <input
+                                      autoFocus
+                                      type="text"
+                                      value={editingValue}
+                                      onChange={e => setEditingValue(e.target.value)}
+                                      onKeyDown={e => {
+                                        if (e.key === 'Enter') handleSaveInlineEdit(child, 'name');
+                                        if (e.key === 'Escape') handleCancelInlineEdit(e);
+                                      }}
+                                      className="border border-violet-400 bg-white rounded-lg px-2 py-0.5 text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-violet-400 w-full"
+                                      placeholder="Nama varian..."
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={savingCell === child.id}
+                                      onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(child, 'name'); }}
+                                      className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs shrink-0"
+                                      title="Simpan"
+                                    >
+                                      {savingCell === child.id ? <RefreshCw size={10} className="animate-spin" /> : <Check size={10} />}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleCancelInlineEdit(e); }}
+                                      className="p-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors shrink-0"
+                                      title="Batal"
+                                    >
+                                      <X size={10} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div
+                                    onClick={(e) => handleStartInlineEdit(child.id, 'name', child.name, e)}
+                                    className="group/mcname flex items-center gap-1 cursor-pointer hover:bg-violet-100/60 rounded px-1 -mx-1 py-0.5 transition-colors"
+                                    title="Klik untuk edit cepat nama varian"
+                                  >
+                                    <p className="text-xs font-bold text-gray-900 truncate group-hover/mcname:text-violet-700">{child.name}</p>
+                                    <Edit size={10} className="text-gray-400 opacity-0 group-hover/mcname:opacity-100 transition-opacity text-violet-600 shrink-0" />
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-3 mt-1 text-[11px] flex-wrap">
                                   <span className="font-semibold text-gray-500">Stok: <strong className="text-gray-900">{child.stock} {child.unit}</strong></span>
-                                  <span className="font-bold text-emerald-600">Rp{(child.priceEcer || 0).toLocaleString('id-ID')}</span>
+                                  {editingCell?.id === child.id && editingCell.field === 'price' ? (
+                                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                      <div className="relative">
+                                        <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[9px] font-bold text-gray-400">Rp</span>
+                                        <input
+                                          autoFocus
+                                          type="text"
+                                          value={editingValue}
+                                          onChange={e => {
+                                            const num = e.target.value.replace(/[^0-9]/g, '');
+                                            setEditingValue(num ? parseInt(num, 10).toLocaleString('id-ID') : '');
+                                          }}
+                                          onKeyDown={e => {
+                                            if (e.key === 'Enter') handleSaveInlineEdit(child, 'price');
+                                            if (e.key === 'Escape') handleCancelInlineEdit(e);
+                                          }}
+                                          className="w-20 pl-5 pr-1 py-0.5 text-right text-xs font-bold text-emerald-700 border border-emerald-400 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                                          placeholder="0"
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        disabled={savingCell === child.id}
+                                        onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(child, 'price'); }}
+                                        className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                                        title="Simpan"
+                                      >
+                                        {savingCell === child.id ? <RefreshCw size={10} className="animate-spin" /> : <Check size={10} />}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); handleCancelInlineEdit(e); }}
+                                        className="p-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                                        title="Batal"
+                                      >
+                                        <X size={10} />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div
+                                      onClick={(e) => handleStartInlineEdit(child.id, 'price', child.priceEcer || 0, e)}
+                                      className="group/mcprice flex items-center gap-1 cursor-pointer hover:bg-emerald-50 rounded px-1 -mx-1 py-0.5 transition-colors"
+                                      title="Klik untuk edit cepat harga ecer"
+                                    >
+                                      <span className="font-bold text-emerald-600 group-hover/mcprice:text-emerald-700">Rp{(child.priceEcer || 0).toLocaleString('id-ID')}</span>
+                                      <Edit size={10} className="text-gray-400 opacity-0 group-hover/mcprice:opacity-100 transition-opacity text-emerald-600 shrink-0" />
+                                    </div>
+                                  )}
                                 </div>
                                 <StockUnitDisplay stock={child.stock} baseUnit={child.unit} units={child.units} />
                               </div>
@@ -2210,7 +2492,48 @@ export default function AdminProducts() {
                                 </span>
                               )}
                             </div>
-                            <h3 className="font-bold text-gray-900 text-sm leading-snug truncate">{formatProductName(p.name)}</h3>
+                            {editingCell?.id === p.id && editingCell.field === 'name' ? (
+                              <div className="flex items-center gap-1.5 py-0.5" onClick={e => e.stopPropagation()}>
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={editingValue}
+                                  onChange={e => setEditingValue(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') handleSaveInlineEdit(p, 'name');
+                                    if (e.key === 'Escape') handleCancelInlineEdit(e);
+                                  }}
+                                  className="border border-violet-400 bg-white rounded-lg px-2 py-1 text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-violet-400 w-full max-w-[280px]"
+                                  placeholder="Nama produk..."
+                                />
+                                <button
+                                  type="button"
+                                  disabled={savingCell === p.id}
+                                  onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(p, 'name'); }}
+                                  className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                                  title="Simpan (Enter)"
+                                >
+                                  {savingCell === p.id ? <RefreshCw size={11} className="animate-spin" /> : <Check size={11} />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleCancelInlineEdit(e); }}
+                                  className="p-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                                  title="Batal (Esc)"
+                                >
+                                  <X size={11} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div
+                                onClick={(e) => handleStartInlineEdit(p.id, 'name', p.name, e)}
+                                className="group/pname inline-flex items-center gap-1.5 cursor-pointer hover:bg-violet-50 rounded px-1.5 -ml-1.5 py-0.5 transition-colors max-w-full"
+                                title="Klik untuk edit cepat nama produk"
+                              >
+                                <h3 className="font-bold text-gray-900 text-sm leading-snug truncate group-hover/pname:text-violet-700">{formatProductName(p.name)}</h3>
+                                <Edit size={11} className="text-gray-400 opacity-0 group-hover/pname:opacity-100 transition-opacity text-violet-600 shrink-0" />
+                              </div>
+                            )}
                             <div className="flex items-center gap-2 flex-wrap mt-0.5">
                               <p className="text-[11px] text-gray-400 font-semibold uppercase tracking-wider">{p.category || 'General'}</p>
                               {p.brand && (
@@ -2275,10 +2598,63 @@ export default function AdminProducts() {
                       </td>
                       <td className="hidden md:table-cell px-3 py-2.5">
                         <div className="flex flex-col gap-0.5">
-                          <p className="text-sm font-black text-emerald-600 leading-none tabular-nums">
-                            Rp{minPrice.toLocaleString('id-ID')}
-                            {hasVariants && minPrice !== maxPrice ? ` - Rp${maxPrice.toLocaleString('id-ID')}` : ''}
-                          </p>
+                          {!hasVariants ? (
+                            editingCell?.id === p.id && editingCell.field === 'price' ? (
+                              <div className="flex items-center gap-1 py-0.5" onClick={e => e.stopPropagation()}>
+                                <div className="relative">
+                                  <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">Rp</span>
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={editingValue}
+                                    onChange={e => {
+                                      const num = e.target.value.replace(/[^0-9]/g, '');
+                                      setEditingValue(num ? parseInt(num, 10).toLocaleString('id-ID') : '');
+                                    }}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') handleSaveInlineEdit(p, 'price');
+                                      if (e.key === 'Escape') handleCancelInlineEdit(e);
+                                    }}
+                                    className="w-24 pl-6 pr-1.5 py-0.5 text-right text-xs font-bold text-emerald-700 border border-emerald-400 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                                    placeholder="0"
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={savingCell === p.id}
+                                  onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(p, 'price'); }}
+                                  className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                                  title="Simpan (Enter)"
+                                >
+                                  {savingCell === p.id ? <RefreshCw size={11} className="animate-spin" /> : <Check size={11} />}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleCancelInlineEdit(e); }}
+                                  className="p-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                                  title="Batal (Esc)"
+                                >
+                                  <X size={11} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div
+                                onClick={(e) => handleStartInlineEdit(p.id, 'price', p.priceEcer || 0, e)}
+                                className="group/pprice inline-flex items-center gap-1 cursor-pointer hover:bg-emerald-50 rounded px-1 -ml-1 py-0.5 transition-colors"
+                                title="Klik untuk edit cepat harga jual"
+                              >
+                                <p className="text-sm font-black text-emerald-600 leading-none tabular-nums group-hover/pprice:text-emerald-700">
+                                  Rp{Number(p.priceEcer || 0).toLocaleString('id-ID')}
+                                </p>
+                                <Edit size={10} className="text-gray-400 opacity-0 group-hover/pprice:opacity-100 transition-opacity text-emerald-600" />
+                              </div>
+                            )
+                          ) : (
+                            <p className="text-sm font-black text-emerald-600 leading-none tabular-nums" title="Harga variasi sesuai daftar varian anak">
+                              Rp{minPrice.toLocaleString('id-ID')}
+                              {minPrice !== maxPrice ? ` - Rp${maxPrice.toLocaleString('id-ID')}` : ''}
+                            </p>
+                          )}
                           <p className="text-[11px] font-medium text-gray-400">
                             Modal: Rp{minCost.toLocaleString('id-ID')}
                             {hasVariants && minCost !== maxCost ? ` - Rp${maxCost.toLocaleString('id-ID')}` : ''}
@@ -2438,7 +2814,48 @@ export default function AdminProducts() {
                                     <span className="text-violet-400 font-bold select-none text-xs">↳</span>
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="font-black text-xs text-gray-900">{child.name}</span>
+                                        {editingCell?.id === child.id && editingCell.field === 'name' ? (
+                                          <div className="flex items-center gap-1.5 py-0.5" onClick={e => e.stopPropagation()}>
+                                            <input
+                                              autoFocus
+                                              type="text"
+                                              value={editingValue}
+                                              onChange={e => setEditingValue(e.target.value)}
+                                              onKeyDown={e => {
+                                                if (e.key === 'Enter') handleSaveInlineEdit(child, 'name');
+                                                if (e.key === 'Escape') handleCancelInlineEdit(e);
+                                              }}
+                                              className="border border-violet-400 bg-white rounded-lg px-2 py-0.5 text-xs font-bold text-gray-900 outline-none focus:ring-2 focus:ring-violet-400 min-w-[200px]"
+                                              placeholder="Nama varian..."
+                                            />
+                                            <button
+                                              type="button"
+                                              disabled={savingCell === child.id}
+                                              onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(child, 'name'); }}
+                                              className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                                              title="Simpan (Enter)"
+                                            >
+                                              {savingCell === child.id ? <RefreshCw size={11} className="animate-spin" /> : <Check size={11} />}
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => { e.stopPropagation(); handleCancelInlineEdit(e); }}
+                                              className="p-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                                              title="Batal (Esc)"
+                                            >
+                                              <X size={11} />
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <div
+                                            onClick={(e) => handleStartInlineEdit(child.id, 'name', child.name, e)}
+                                            className="group/cname flex items-center gap-1 cursor-pointer hover:bg-violet-100/60 rounded px-1 -mx-1 py-0.5 transition-colors"
+                                            title="Klik untuk edit cepat nama varian"
+                                          >
+                                            <span className="font-black text-xs text-gray-900 group-hover/cname:text-violet-700">{child.name}</span>
+                                            <Edit size={10} className="text-gray-400 opacity-0 group-hover/cname:opacity-100 transition-opacity text-violet-600" />
+                                          </div>
+                                        )}
                                         <span className="text-[10px] font-mono font-bold text-gray-500 bg-gray-100 px-1 rounded">SKU: {formatDisplaySku(child.sku, child.id)}</span>
                                         {child.barcode && (
                                           <span className="text-[10px] font-mono text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded flex items-center gap-1" title="Barcode Utama">
@@ -2461,7 +2878,54 @@ export default function AdminProducts() {
                                     </div>
                                     <div className="text-right min-w-[90px]">
                                       <p className="text-[10px] font-bold text-gray-400 uppercase">Harga Ecer</p>
-                                      <p className="text-xs font-black text-emerald-600">Rp{(child.priceEcer || 0).toLocaleString('id-ID')}</p>
+                                      {editingCell?.id === child.id && editingCell.field === 'price' ? (
+                                        <div className="flex items-center justify-end gap-1 mt-0.5" onClick={e => e.stopPropagation()}>
+                                          <div className="relative">
+                                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-gray-400">Rp</span>
+                                            <input
+                                              autoFocus
+                                              type="text"
+                                              value={editingValue}
+                                              onChange={e => {
+                                                const num = e.target.value.replace(/[^0-9]/g, '');
+                                                setEditingValue(num ? parseInt(num, 10).toLocaleString('id-ID') : '');
+                                              }}
+                                              onKeyDown={e => {
+                                                if (e.key === 'Enter') handleSaveInlineEdit(child, 'price');
+                                                if (e.key === 'Escape') handleCancelInlineEdit(e);
+                                              }}
+                                              className="w-24 pl-6 pr-1.5 py-0.5 text-right text-xs font-bold text-emerald-700 border border-emerald-400 rounded-lg outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                                              placeholder="0"
+                                            />
+                                          </div>
+                                          <button
+                                            type="button"
+                                            disabled={savingCell === child.id}
+                                            onClick={(e) => { e.stopPropagation(); handleSaveInlineEdit(child, 'price'); }}
+                                            className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                                            title="Simpan (Enter)"
+                                          >
+                                            {savingCell === child.id ? <RefreshCw size={11} className="animate-spin" /> : <Check size={11} />}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); handleCancelInlineEdit(e); }}
+                                            className="p-1 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                                            title="Batal (Esc)"
+                                          >
+                                            <X size={11} />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div
+                                          onClick={(e) => handleStartInlineEdit(child.id, 'price', child.priceEcer || 0, e)}
+                                          className="group/cprice flex items-center justify-end gap-1 cursor-pointer hover:bg-emerald-50 rounded px-1 -mr-1 py-0.5 transition-colors"
+                                          title="Klik untuk edit cepat harga ecer"
+                                        >
+                                          <p className="text-xs font-black text-emerald-600 group-hover/cprice:text-emerald-700">Rp{(child.priceEcer || 0).toLocaleString('id-ID')}</p>
+                                          <Edit size={10} className="text-gray-400 opacity-0 group-hover/cprice:opacity-100 transition-opacity text-emerald-600" />
+                                        </div>
+                                      )}
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                       <Link
