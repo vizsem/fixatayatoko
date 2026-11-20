@@ -32,6 +32,8 @@ import {
   syncAvgPoToActiveHpp,
   resetAvgFromCurrentStock,
   applyPriceRecommendations,
+  bulkUpdateWholesalePrice,
+  type BulkWholesaleOptions,
 } from '@/lib/actions/product.actions';
 
 export interface ProductUnitItem {
@@ -140,6 +142,12 @@ export default function PricingHPPPage() {
   const [showDivideModal, setShowDivideModal] = useState(false);
   const [showSyncAvgModal, setShowSyncAvgModal] = useState(false);
   const [showResetStockModal, setShowResetStockModal] = useState(false);
+  const [newProductFilter, setNewProductFilter] = useState<'ALL' | 'NEW' | 'HAS_PO' | 'NO_PO'>('ALL');
+  const [showWholesaleModal, setShowWholesaleModal] = useState(false);
+  const [wholesaleMode, setWholesaleMode] = useState<'DISCOUNT_PERCENT' | 'DISCOUNT_NOMINAL' | 'MARGIN_COST' | 'FIXED_PRICE'>('DISCOUNT_PERCENT');
+  const [wholesaleValue, setWholesaleValue] = useState<number>(5);
+  const [wholesaleMinQty, setWholesaleMinQty] = useState<number>(3);
+  const [wholesaleAllUnits, setWholesaleAllUnits] = useState(false);
   const [divideValue, setDivideValue] = useState<number>(1);
   const [isResetting, startResetTransition] = useTransition();
 
@@ -466,7 +474,19 @@ export default function PricingHPPPage() {
           (statusFilter === 'ACTIVE' && p.isActive) ||
           (statusFilter === 'ARCHIVED' && !p.isActive);
 
-        return matchStatus && matchSearch && matchCat && matchMargin && matchTax && matchVariant;
+        let matchNewPo = true;
+        const thirtyDaysAgo = Date.now() - 30 * 86400 * 1000;
+        if (newProductFilter === 'NEW') {
+          const isNew = p.updatedAt ? new Date(p.updatedAt).getTime() > thirtyDaysAgo : false;
+          const hasNoPo = !avgHppMap[p.id] || (avgHppMap[p.id]?.poCount || 0) === 0;
+          matchNewPo = isNew && hasNoPo;
+        } else if (newProductFilter === 'HAS_PO') {
+          matchNewPo = (avgHppMap[p.id]?.poCount || 0) > 0;
+        } else if (newProductFilter === 'NO_PO') {
+          matchNewPo = !avgHppMap[p.id] || (avgHppMap[p.id]?.poCount || 0) === 0;
+        }
+
+        return matchStatus && matchSearch && matchCat && matchMargin && matchTax && matchVariant && matchNewPo;
       })
       .sort((a, b) => {
         if (sortBy === 'urgent_first') {
@@ -510,7 +530,7 @@ export default function PricingHPPPage() {
         }
         return a.name.localeCompare(b.name);
       });
-  }, [products, search, selectedCategory, statusFilter, marginFilter, taxFilter, variantFilter, sortBy, avgHppMap, priceReviewByProduct]);
+  }, [products, search, selectedCategory, statusFilter, marginFilter, taxFilter, variantFilter, sortBy, avgHppMap, priceReviewByProduct, newProductFilter]);
 
   // Multi-select helpers
   const allFilteredIds = useMemo(() => filteredProducts.map(p => p.id), [filteredProducts]);
@@ -761,6 +781,35 @@ export default function PricingHPPPage() {
         await fetchData();
       } catch (err: any) {
         notify.error(err.message || 'Gagal mengubah status kunci HPP');
+      }
+    });
+  };
+
+  const handleBulkWholesale = () => {
+    if (selectedIds.size === 0) { notify.error('Pilih minimal 1 produk'); return; }
+    startResetTransition(async () => {
+      try {
+        const userRes = await supabase.auth.getUser();
+        const adminEmail = userRes.data.user?.email || 'admin';
+        const result = await bulkUpdateWholesalePrice(
+          Array.from(selectedIds),
+          {
+            mode: wholesaleMode,
+            value: wholesaleValue,
+            minQty: wholesaleMinQty,
+            roundingStep: 100,
+            targetUnitMode: wholesaleAllUnits ? 'ALL_UNITS' : 'BASE_ONLY',
+          },
+          adminEmail,
+        );
+        setShowWholesaleModal(false);
+        if (!result.success) throw new Error(result.error);
+        notify.success(`✅ Berhasil update harga grosir untuk ${result.updated} produk`);
+        setSelectedIds(new Set());
+        await fetchData();
+      } catch (err: any) {
+        setShowWholesaleModal(false);
+        notify.error(err.message || 'Gagal update grosir');
       }
     });
   };
@@ -1211,7 +1260,18 @@ export default function PricingHPPPage() {
                   <option value="PPH22">🏗️ PPh 22 ({kpis.pph22Count})</option>
                 </select>
 
-                <select
+                 <select
+                  value={newProductFilter}
+                  onChange={e => { setNewProductFilter(e.target.value as any); setSelectedIds(new Set()); }}
+                  className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500 w-full md:w-auto"
+                >
+                  <option value="ALL">Semua (PO Status)</option>
+                  <option value="HAS_PO">📦 Sudah PO</option>
+                  <option value="NO_PO">🆕 Belum PO</option>
+                  <option value="NEW">⭐ Produk Baru (30hr)</option>
+                </select>
+
+                 <select
                   value={sortBy}
                   onChange={e => setSortBy(e.target.value as any)}
                   className="bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 col-span-2 w-full md:w-auto"
@@ -1309,6 +1369,15 @@ export default function PricingHPPPage() {
                     <Unlock size={12} />
                     Buka Kunci
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowWholesaleModal(true)}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border border-emerald-500/50"
+                    title="Atur harga grosir massal untuk produk yang dipilih"
+                  >
+                    <Tag size={12} />
+                    Set Grosir
+                  </button>
                 </div>
               </div>
             )}
@@ -1386,7 +1455,7 @@ export default function PricingHPPPage() {
                             className={`hover:bg-slate-50/60 transition-colors group ${isSelected ? 'bg-blue-50/40' : ''}`}
                           >
                             {/* Checkbox */}
-                            <td className="py-4 pl-6 pr-2">
+                            <td className="py-2 pl-6 pr-2">
                               <button
                                 onClick={() => toggleSelectOne(p.id)}
                                 className="p-1 hover:text-blue-600 transition-colors"
@@ -1399,7 +1468,7 @@ export default function PricingHPPPage() {
                             </td>
 
                             {/* Produk Info */}
-                            <td className="py-4 px-4 max-w-[280px]">
+                            <td className="py-2 px-4 max-w-[280px]">
                               <div className="space-y-1">
                                 <div className="flex items-start gap-1.5 flex-wrap">
                                   <Link
@@ -1493,14 +1562,14 @@ export default function PricingHPPPage() {
                             </td>
 
                             {/* Stok & Semua Satuan Produk yang Diset */}
-                            <td className="py-4 px-4 text-center">
+                            <td className="py-2 px-4 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <span className="font-black text-slate-800 text-sm">{p.stock}</span>
                                 <span className="text-[10px] text-slate-400 font-bold uppercase">{p.unit}</span>
                               </div>
 
                               {/* Daftar semua satuan yang telah diset */}
-                              <div className="flex flex-wrap gap-1 mt-1 justify-center max-w-[210px] mx-auto">
+                              <div className="flex flex-wrap gap-1 mt-0.5 justify-center">
                                 {p.units.map(u => {
                                   const isBase = u.code === p.unit;
                                   const review = reviewByUnit.get(u.code);
@@ -1530,7 +1599,7 @@ export default function PricingHPPPage() {
                             </td>
 
                             {/* Modal HPP Aktif & Lock Status */}
-                            <td className="py-4 px-4 text-right">
+                            <td className="py-2 px-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
                                 {p.isHppLocked && (
                                   <span
@@ -1550,31 +1619,18 @@ export default function PricingHPPPage() {
                               </div>
 
                               {otherUnitCosts.length > 0 && (
-                                <div className="mt-1.5 flex flex-col items-end gap-1">
+                                <div className="flex flex-wrap gap-0.5 mt-0.5 justify-end" title={otherUnitCosts.map(u => `${u.code}: Rp${(p.costPrice * u.contains).toLocaleString('id-ID')}`).join(' | ')}>
                                   {otherUnitCosts.map((unit) => (
-                                    <div
-                                      key={unit.code}
-                                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px] transition-colors hover:bg-slate-100/80"
-                                      title={`Estimasi Modal per ${unit.code} (isi ${unit.contains} ${p.unit})`}
-                                    >
-                                      <span className="font-black text-slate-600 uppercase">
-                                        {unit.code}
-                                      </span>
-                                      <span className="text-[9px] font-bold text-slate-400 bg-white px-1 py-0.2 rounded border border-slate-200/70 leading-none">
-                                        isi {unit.contains}
-                                      </span>
-                                      <span className="text-slate-300 font-bold">·</span>
-                                      <span className="font-black text-slate-800">
-                                        Rp {(p.costPrice * unit.contains).toLocaleString('id-ID')}
-                                      </span>
-                                    </div>
+                                    <span key={unit.code} className="text-[9px] font-black text-slate-400 bg-slate-50 border border-slate-200 px-1 py-0.5 rounded">
+                                      {unit.code}·{Math.round(p.costPrice * unit.contains / 1000)}k
+                                    </span>
                                   ))}
                                 </div>
                               )}
                             </td>
 
                             {/* AVG HPP dari PO */}
-                            <td className="py-4 px-4 text-right">
+                            <td className="py-2 px-4 text-right">
                               {avgLoading ? (
                                 <div className="h-4 w-20 bg-slate-100 rounded animate-pulse ml-auto" />
                               ) : avg && avg.avgCost > 0 ? (
@@ -1622,13 +1678,13 @@ export default function PricingHPPPage() {
                             </td>
 
                             {/* Harga Jual Ecer */}
-                            <td className="py-4 px-4 text-right font-black text-blue-700">
+                            <td className="py-2 px-4 text-right font-black text-blue-700">
                               <p className="text-sm">Rp {p.priceEcer.toLocaleString('id-ID')}</p>
                               <p className="text-[10px] text-slate-400 font-bold">/{p.unit}</p>
                             </td>
 
                             {/* Margin Keuntungan */}
-                            <td className="py-4 px-4 text-right">
+                            <td className="py-2 px-4 text-right">
                               <div className="flex flex-col items-end">
                                 <div className="flex items-baseline gap-1">
                                   <span className={`font-black ${isLoss ? 'text-rose-600' : isSlim ? 'text-amber-600' : 'text-emerald-600'}`}>
@@ -1650,35 +1706,23 @@ export default function PricingHPPPage() {
                                   </span>
                                 )}
 
-                                {/* Margin Satuan Lainnya (DUS, PACK, CTN, dll) */}
+                                {/* Margin Satuan Lainnya - compact chips */}
                                 {otherUnitCosts.length > 0 && (
-                                  <div className="mt-1.5 flex flex-col items-end gap-1">
+                                  <div className="flex flex-wrap gap-0.5 mt-0.5 justify-end">
                                     {otherUnitCosts.map((unit) => {
                                       const unitCost = p.costPrice * (unit.contains || 1);
                                       const unitPrice = Number(unit.price || 0);
-                                      const unitMarginRp = unitPrice - unitCost;
-                                      const unitMarginPct = unitPrice > 0 ? (unitMarginRp / unitPrice) * 100 : 0;
-                                      const isUnitLoss = unitMarginRp <= 0;
+                                      const unitMarginPct = unitPrice > 0 ? ((unitPrice - unitCost) / unitPrice) * 100 : 0;
+                                      const isUnitLoss = unitMarginPct <= 0;
                                       const isUnitSlim = unitMarginPct > 0 && unitMarginPct < 8;
-
                                       return (
-                                        <div
+                                        <span
                                           key={unit.code}
-                                          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200/80 text-[10px] transition-colors hover:bg-slate-100/80"
-                                          title={`Margin per ${unit.code} (isi ${unit.contains} ${p.unit}): Harga Rp ${unitPrice.toLocaleString('id-ID')} - Modal Rp ${unitCost.toLocaleString('id-ID')}`}
+                                          className={`text-[9px] font-black px-1 py-0.5 rounded ${isUnitLoss ? 'bg-rose-50 text-rose-600' : isUnitSlim ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}
+                                          title={`${unit.code}: margin ${unitMarginPct.toFixed(1)}% | Harga Rp${unitPrice.toLocaleString('id-ID')} - Modal Rp${unitCost.toLocaleString('id-ID')}`}
                                         >
-                                          <span className="font-black text-slate-600 uppercase">
-                                            {unit.code}
-                                          </span>
-                                          <span className={`font-black ${isUnitLoss ? 'text-rose-600' : isUnitSlim ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                            {unitMarginRp >= 0 ? '+' : ''}Rp {unitMarginRp.toLocaleString('id-ID')}
-                                          </span>
-                                          <span className={`px-1 py-0.2 rounded text-[9px] font-black ${
-                                            isUnitLoss ? 'bg-rose-100 text-rose-700' : isUnitSlim ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                                          }`}>
-                                            {unitMarginPct.toFixed(1)}%
-                                          </span>
-                                        </div>
+                                          {unit.code} {unitMarginPct.toFixed(0)}%
+                                        </span>
                                       );
                                     })}
                                   </div>
@@ -1687,7 +1731,7 @@ export default function PricingHPPPage() {
                             </td>
 
                             {/* Harga Grosir */}
-                            <td className="py-4 px-4 text-right">
+                            <td className="py-2 px-4 text-right">
                               {p.priceGrosir > 0 ? (
                                 <div>
                                   <p className="font-black text-purple-700">Rp {p.priceGrosir.toLocaleString('id-ID')}</p>
@@ -1699,7 +1743,7 @@ export default function PricingHPPPage() {
                             </td>
 
                             {/* Aksi */}
-                            <td className="py-4 px-5 text-center">
+                            <td className="py-2 px-5 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <button
                                   onClick={() => handleOpenEdit(p)}
@@ -2726,6 +2770,50 @@ export default function PricingHPPPage() {
       )}
 
       {/* ===================== SET MARGIN OTOMATIS MODAL ===================== */}
+      {showWholesaleModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowWholesaleModal(false)}>
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-black text-slate-800 mb-1 flex items-center gap-2">
+              <Tag size={16} className="text-emerald-600" /> Set Harga Grosir Massal
+            </h3>
+            <p className="text-xs text-slate-400 mb-4">{selectedIds.size} produk dipilih</p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Mode Penetapan Harga</label>
+                <select value={wholesaleMode} onChange={e => setWholesaleMode(e.target.value as any)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500">
+                  <option value="DISCOUNT_PERCENT">Diskon % dari Harga Ecer</option>
+                  <option value="DISCOUNT_NOMINAL">Potongan Nominal Rp dari Ecer</option>
+                  <option value="MARGIN_COST">Margin % di atas Modal (HPP)</option>
+                  <option value="FIXED_PRICE">Harga Tetap Rp</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  {wholesaleMode === 'DISCOUNT_PERCENT' ? 'Diskon (%)' : wholesaleMode === 'DISCOUNT_NOMINAL' ? 'Potongan (Rp)' : wholesaleMode === 'MARGIN_COST' ? 'Margin dari Modal (%)' : 'Harga Grosir Tetap (Rp)'}
+                </label>
+                <input type="number" min="0" value={wholesaleValue} onChange={e => setWholesaleValue(Number(e.target.value))} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Min. Beli Grosir (pcs/unit)</label>
+                <input type="number" min="1" value={wholesaleMinQty} onChange={e => setWholesaleMinQty(Number(e.target.value))} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 bg-slate-50 outline-none focus:ring-2 focus:ring-emerald-500" />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={wholesaleAllUnits} onChange={e => setWholesaleAllUnits(e.target.checked)} className="rounded accent-emerald-600" />
+                <span className="text-xs font-bold text-slate-700">Terapkan ke semua satuan (RTG, DUS, dll.)</span>
+              </label>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button onClick={() => setShowWholesaleModal(false)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-xl transition-colors">
+                Batal
+              </button>
+              <button onClick={handleBulkWholesale} disabled={isResetting} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {isResetting ? '⏳ Menyimpan...' : 'Terapkan Grosir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showMarginModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5">
