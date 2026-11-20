@@ -121,8 +121,8 @@ export default function PrintLabelPage({ params }: { params: Promise<{ id: strin
                     {formatTitleCase(product.name || product.Nama)}
                   </h2>
                   {(product.isVariant || product.parent_id || product.raw_data?.Parent_ID) && (
-                    <span className="px-1 py-0.2 bg-black text-white rounded-[2px] text-[5.5px] font-bold uppercase shrink-0 leading-none">
-                      {product.variantName || product.raw_data?.variantName || 'VAR'}
+                    <span className="px-1 py-0.2 bg-black text-white rounded-[2px] text-[5.5px] font-bold shrink-0 leading-none">
+                      {formatTitleCase(product.variantName || product.raw_data?.variantName || 'Var')}
                     </span>
                   )}
                 </div>

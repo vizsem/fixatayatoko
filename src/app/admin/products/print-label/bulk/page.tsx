@@ -108,8 +108,8 @@ function LabelCardItem({
                 <h2 className={`font-bold leading-tight truncate text-black ${isSheet3 ? 'text-[11px]' : isLarge ? 'text-[9.5px]' : 'text-[7.5px]'}`} title={item.parentName || item.name}>
                   {formatTitleCase(item.parentName || item.name)}
                 </h2>
-                <span className={`bg-black text-white rounded-[2px] font-bold uppercase shrink-0 leading-none ${isSheet3 ? 'px-1.5 py-0.5 text-[7px]' : isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
-                  {item.variantName || 'VAR'}
+                <span className={`bg-black text-white rounded-[2px] font-bold shrink-0 leading-none ${isSheet3 ? 'px-1.5 py-0.5 text-[7px]' : isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
+                  {formatTitleCase(item.variantName || 'Var')}
                 </span>
               </div>
             ) : item.isUnitLabel ? (
@@ -117,8 +117,8 @@ function LabelCardItem({
                 <h2 className={`font-bold leading-tight truncate text-black ${isSheet3 ? 'text-[11px]' : isLarge ? 'text-[9.5px]' : 'text-[7.5px]'}`} title={item.parentName || item.name}>
                   {formatTitleCase(item.parentName || item.name)}
                 </h2>
-                <span className={`bg-black text-white rounded-[2px] font-bold uppercase shrink-0 leading-none ${isSheet3 ? 'px-1.5 py-0.5 text-[7px]' : isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
-                  {item.variantName || `SATUAN ${item.unit}`}
+                <span className={`bg-black text-white rounded-[2px] font-bold shrink-0 leading-none ${isSheet3 ? 'px-1.5 py-0.5 text-[7px]' : isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
+                  {formatTitleCase(item.variantName || `Satuan ${item.unit}`)}
                 </span>
               </div>
             ) : (
