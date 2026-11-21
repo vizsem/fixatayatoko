@@ -114,7 +114,7 @@ export async function simpanTransaksiKasir(data: TransaksiKasirInput): Promise<T
         : cariContainsSatuan(it.unit ?? produk?.unit, raw.units)
 
       const quantity = Number(it.quantity || 0)
-      const baseQuantity = Math.max(0, Math.round(quantity * contains))
+      const baseQuantity = Math.max(0, Number((quantity * contains).toFixed(3)))
 
       const snapshot = nilaiSnapshotHpp({
         // Daftar field ditulis EXPLISIT dan `cost` kiriman klien sengaja TIDAK
@@ -364,5 +364,147 @@ export async function simpanTransaksiKasir(data: TransaksiKasirInput): Promise<T
   } catch (error: any) {
     console.error('simpanTransaksiKasir error:', error)
     return { success: false, error: error?.message || 'Gagal menyimpan transaksi kasir' }
+  }
+}
+
+
+export type ReturItemInput = {
+  productId: string
+  quantity: number
+  unit: string
+  contains?: number
+  price?: number
+  reason?: string
+}
+
+export type ProcessReturKasirInput = {
+  receiptNoOrId: string
+  items: ReturItemInput[]
+  refundAmount: number
+  refundMethod: 'CASH' | 'DOMPET'
+  reason?: string
+  warehouseId?: string
+}
+
+export type ProcessReturKasirResult = {
+  success: boolean
+  error?: string
+  data?: {
+    returId: string
+    receiptNo: string
+    refundAmount: number
+    restockedItems: Array<{ productId: string; quantity: number }>
+  }
+}
+
+export async function processQuickOrderReturn(data: ProcessReturKasirInput): Promise<ProcessReturKasirResult> {
+  await requireStaff()
+  try {
+    const queryTerm = String(data?.receiptNoOrId || '').trim()
+    if (!queryTerm) return { success: false, error: 'Nomor struk atau ID transaksi tidak valid' }
+    const items = Array.isArray(data?.items) ? data.items : []
+    if (items.length === 0) return { success: false, error: 'Tidak ada item yang dipilih untuk diretur' }
+
+    // 1. Cari order di database berdasarkan id, order_id, atau raw_data->>receiptNo
+    const { data: orderList, error: findError } = await supabaseAdmin
+      .from('orders')
+      .select('*')
+      .or(`id.eq.${queryTerm},order_id.eq.${queryTerm},raw_data->>receiptNo.eq.${queryTerm}`)
+      .limit(1)
+
+    if (findError || !orderList || orderList.length === 0) {
+      return { success: false, error: `Transaksi dengan nomor "${queryTerm}" tidak ditemukan` }
+    }
+
+    const order = orderList[0]
+    const raw = order.raw_data || {}
+    const warehouseId = data.warehouseId || raw.warehouseId || 'gudang-utama'
+    const now = new Date().toISOString()
+    const returId = `ret_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+    const returReceiptNo = `RET-${raw.receiptNo || (order.id || '').slice(-6).toUpperCase()}`
+
+    // 2. Kembalikan stok untuk setiap item yang diretur
+    const restockedItems: Array<{ productId: string; quantity: number }> = []
+    for (const it of items) {
+      const contains = Number(it.contains || 1)
+      const baseQty = Math.max(0, Number((Number(it.quantity || 0) * contains).toFixed(3)))
+      if (baseQty > 0) {
+        await addStock({
+          productId: it.productId,
+          amount: baseQty,
+          warehouseId,
+          reference: returReceiptNo,
+          notes: `Retur Kasir #${returReceiptNo}: ${it.quantity} ${it.unit || 'PCS'}${it.reason ? ` (${it.reason})` : ''}`,
+          source: 'ORDER',
+        })
+        restockedItems.push({ productId: it.productId, quantity: baseQty })
+      }
+    }
+
+    // 3. Catat riwayat retur di raw_data order
+    const existingReturns = Array.isArray(raw.returns) ? raw.returns : []
+    existingReturns.push({
+      returId,
+      returReceiptNo,
+      items,
+      refundAmount: Number(data.refundAmount || 0),
+      refundMethod: data.refundMethod,
+      reason: data.reason || 'Retur Toko',
+      createdAt: now,
+    })
+
+    const isAllReturned = items.length >= (order.items || []).length
+    const newStatus = isAllReturned ? 'DIRETUR' : order.status
+
+    await supabaseAdmin
+      .from('orders')
+      .update({
+        status: newStatus,
+        raw_data: {
+          ...raw,
+          returns: existingReturns,
+          hasReturns: true,
+          updatedAt: now,
+        },
+        updated_at: now,
+      })
+      .eq('id', order.id)
+
+    // 4. Jika refund via DOMPET dan ada user_id
+    if (data.refundMethod === 'DOMPET' && order.user_id && data.refundAmount > 0) {
+      const { data: customer } = await supabaseAdmin
+        .from('customers')
+        .select('wallet_balance')
+        .eq('id', order.user_id)
+        .maybeSingle()
+
+      const newBalance = Number(customer?.wallet_balance || 0) + data.refundAmount
+      await supabaseAdmin.from('customers').update({ wallet_balance: newBalance, updated_at: now }).eq('id', order.user_id)
+      await supabaseAdmin.from('wallet_logs').insert({
+        id: `wal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        user_id: order.user_id,
+        amount: data.refundAmount,
+        description: `Refund retur pesanan #${returReceiptNo}`,
+        created_at: now,
+        raw_data: { type: 'refund', returReceiptNo, orderId: order.id, amount: data.refundAmount, createdAt: now },
+      })
+    }
+
+    revalidatePath('/admin/orders')
+    revalidatePath('/admin/products')
+    revalidatePath('/admin/inventory')
+
+    return {
+      success: true,
+      data: {
+        returId,
+        receiptNo: returReceiptNo,
+        refundAmount: Number(data.refundAmount || 0),
+        restockedItems,
+      },
+    }
+  } catch (error: any) {
+    console.error('processQuickOrderReturn error:', error)
+    return { success: false, error: error?.message || 'Gagal memproses retur transaksi' }
   }
 }

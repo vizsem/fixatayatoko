@@ -7,17 +7,18 @@ import {
   Package, ShoppingCart, Search, Plus, Minus, Printer, Bell,
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
   History, X, Trash2, LayoutGrid, List, AlignJustify, Edit, ShoppingBag, Camera, User,
-  Settings, Zap, ScanLine, PauseCircle, PlayCircle, RotateCcw, Layers, CornerDownRight
+  Settings, Zap, ScanLine, PauseCircle, PlayCircle, RotateCcw, Layers, CornerDownRight,
+  MessageCircle, Monitor, Undo2, AlertTriangle, FileText
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import { playScanBeep } from '@/lib/sound';
-import { simpanTransaksiKasir } from '@/lib/actions/cashier.actions';
+import { simpanTransaksiKasir, processQuickOrderReturn } from '@/lib/actions/cashier.actions';
 import { resolveCustomerUnitPrice } from '@/lib/customer-pricing';
 import { enqueueOfflineTx, getOfflineQueue, syncOfflineQueue, removeOfflineTx } from '@/lib/offlineQueue';
 import type { OfflineTx } from '@/lib/offlineQueue';
-import { printToThermal, generateESCReceipt } from '@/lib/printer';
+import { printToThermal, generateESCReceipt, formatWhatsAppReceipt } from '@/lib/printer';
 import AdminChatInterface from '@/components/AdminChatInterface';
 import QrisPaymentModal from '@/components/QrisPaymentModal';
 import { supabase } from '@/lib/supabase';
@@ -92,6 +93,7 @@ type Order = {
   id: string;
   receiptNo?: string;
   dailySeq?: number;
+  dueDate?: string | null;
   customerName: string;
   customerPhone: string;
   items: CartItem[];
@@ -161,6 +163,43 @@ export default function CashierPOS() {
   const [productSort, setProductSort] = useState<'recent_sold' | 'recent_update' | 'name'>('recent_sold');
   const [recentlySoldMap, setRecentlySoldMap] = useState<Map<string, number>>(new Map());
   const [customerPriceTier, setCustomerPriceTier] = useState<'Retail' | 'Semi-Grosir' | 'Grosir'>('Retail');
+
+  // Pengaturan Ukuran Kertas & Struk Kasir
+  const [printSettings, setPrintSettings] = useState<{
+    paperWidth: '58mm' | '80mm';
+    ecoMode: boolean;
+    footerPromo: string;
+  }>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pos_print_settings');
+      if (saved) {
+        try { return JSON.parse(saved); } catch {}
+      }
+    }
+    return {
+      paperWidth: '58mm',
+      ecoMode: false,
+      footerPromo: 'Terima kasih telah berbelanja di ATAYATOKO!',
+    };
+  });
+
+  const updatePrintSettings = (newSettings: Partial<typeof printSettings>) => {
+    setPrintSettings(prev => {
+      const updated = { ...prev, ...newSettings };
+      try { localStorage.setItem('pos_print_settings', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  // State Retur Penjualan Cepat
+  const [showReturModal, setShowReturModal] = useState(false);
+  const [returSearch, setReturSearch] = useState('');
+  const [returLoading, setReturLoading] = useState(false);
+  const [returOrder, setReturOrder] = useState<any | null>(null);
+  const [returQuantities, setReturQuantities] = useState<Record<string, number>>({});
+  const [returReason, setReturReason] = useState('Barang Cacat/Tukar');
+  const [returRefundMethod, setReturRefundMethod] = useState<'CASH' | 'DOMPET'>('CASH');
+  const [isSubmittingRetur, setIsSubmittingRetur] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [displayLimit, setDisplayLimit] = useState(80);
@@ -709,11 +748,167 @@ export default function CashierPOS() {
   }, [products, selectedCustomer, customerPriceTier]);
 
   const updatePrice = useCallback((id: string, newTotal: number, quantity: number) => {
+    const item = cart.find(i => i.id === id);
+    if (item && item.cost > 0) {
+      const unitPrice = quantity > 0 ? newTotal / quantity : 0;
+      if (unitPrice < item.cost) {
+        const rugi = (item.cost - unitPrice) * quantity;
+        const confirmBoncos = window.confirm(
+          `⚠️ PERINGATAN ANTI-BONCOS!
+
+Harga jual yang dimasukkan (Rp${unitPrice.toLocaleString('id-ID')}) berada DI BAWAH MODAL HPP (Rp${item.cost.toLocaleString('id-ID')}).
+Estimasi kerugian: Rp${rugi.toLocaleString('id-ID')}.
+
+Tetap lanjutkan menyimpan harga ini?`
+        );
+        if (!confirmBoncos) {
+          setEditingPriceId(null);
+          return;
+        }
+      }
+    }
     setCart(prev => prev.map(i => i.id === id ? { ...i, price: newTotal / quantity } : i));
     setEditingPriceId(null);
-  }, []);
+  }, [cart]);
+
+
+  // Handler Pencarian Order untuk Retur
+  const handleSearchReturOrder = async () => {
+    if (!returSearch.trim()) return toast.error('Ketik no struk atau ID transaksi');
+    setReturLoading(true);
+    setReturOrder(null);
+    setReturQuantities({});
+    try {
+      const term = returSearch.trim();
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .or(`id.eq.${term},order_id.eq.${term},raw_data->>receiptNo.eq.${term}`)
+        .limit(1);
+
+      if (error || !data || data.length === 0) {
+        toast.error(`Pesanan "${term}" tidak ditemukan.`);
+        return;
+      }
+      const ord = data[0];
+      setReturOrder(ord);
+      const initialQty: Record<string, number> = {};
+      const items = Array.isArray(ord.items) ? ord.items : (ord.raw_data?.items || []);
+      items.forEach((it: any) => {
+        initialQty[it.id] = 0;
+      });
+      setReturQuantities(initialQty);
+      toast.success(`Ditemukan transaksi #${ord.raw_data?.receiptNo || ord.id.slice(-6)}`);
+    } catch (err: any) {
+      toast.error('Gagal mencari transaksi: ' + err.message);
+    } finally {
+      setReturLoading(false);
+    }
+  };
+
+  const handleExecuteRetur = async () => {
+    if (!returOrder) return;
+    const items = Array.isArray(returOrder.items) ? returOrder.items : (returOrder.raw_data?.items || []);
+    const itemsToReturn = items
+      .filter((it: any) => Number(returQuantities[it.id] || 0) > 0)
+      .map((it: any) => ({
+        productId: it.id,
+        quantity: Number(returQuantities[it.id]),
+        unit: it.unit || 'PCS',
+        contains: Number(it.contains || 1),
+        price: Number(it.price || 0),
+        reason: returReason,
+      }));
+
+    if (itemsToReturn.length === 0) {
+      return toast.error('Pilih minimal 1 item dengan jumlah > 0 untuk diretur');
+    }
+
+    const totalRefund = itemsToReturn.reduce((sum: number, it: any) => sum + (it.price * it.quantity), 0);
+
+    if (!window.confirm(`Proses retur senilai Rp${totalRefund.toLocaleString('id-ID')} via ${returRefundMethod}? Stok akan otomatis dikembalikan ke inventori.`)) {
+      return;
+    }
+
+    setIsSubmittingRetur(true);
+    try {
+      const res = await processQuickOrderReturn({
+        receiptNoOrId: returOrder.raw_data?.receiptNo || returOrder.id,
+        items: itemsToReturn,
+        refundAmount: totalRefund,
+        refundMethod: returRefundMethod,
+        reason: returReason,
+      });
+
+      if (!res.success) {
+        toast.error(res.error || 'Gagal memproses retur');
+        return;
+      }
+
+      toast.success(`Retur berhasil! Nomor Nota: ${res.data?.receiptNo}`);
+      setShowReturModal(false);
+      setReturOrder(null);
+      setReturSearch('');
+    } catch (e: any) {
+      toast.error('Error proses retur: ' + e.message);
+    } finally {
+      setIsSubmittingRetur(false);
+    }
+  };
+
+  // Handler Kirim Struk via WhatsApp
+  const handleSendWhatsApp = useCallback((orderToSend: any) => {
+    let phone = orderToSend.customerPhone || '';
+    if (!phone) {
+      const input = window.prompt('Masukkan nomor WhatsApp pelanggan (contoh: 08123456789):');
+      if (!input) return;
+      phone = input.trim();
+    }
+    let clean = phone.replace(/\D/g, '');
+    if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+    if (!clean.startsWith('62')) clean = '62' + clean;
+    
+    const text = formatWhatsAppReceipt(orderToSend, {
+      paperWidth: printSettings.paperWidth,
+      footerPromo: printSettings.footerPromo,
+    });
+    window.open(`https://wa.me/${clean}?text=${encodeURIComponent(text)}`, '_blank');
+  }, [printSettings]);
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.quantity), 0), [cart]);
+
+  // Broadcast realtime ke Customer Facing Display (/cashier/display)
+  useEffect(() => {
+    try {
+      const payload = {
+        cart: cart.map(i => ({
+          id: i.id,
+          name: i.name,
+          price: i.price,
+          originalPrice: i.originalPrice,
+          quantity: i.quantity,
+          unit: i.unit,
+          contains: i.contains,
+          appliedTier: i.appliedTier,
+        })),
+        subtotal,
+        total: subtotal + (paymentMethod === 'Kurir Toko' ? 15000 : 0),
+        cartSavings: cart.reduce((sum, item) => {
+          const orig = Number(item.originalPrice || item.price || 0);
+          const cur = Number(item.price || 0);
+          return sum + (orig > cur ? (orig - cur) * item.quantity : 0);
+        }, 0),
+        paymentMethod,
+        status: cart.length > 0 ? (isProcessing ? 'paying' : 'scanning') : 'idle',
+        customerName: selectedCustomer?.name || (paymentMethod === 'TEMPO' ? customerName : undefined),
+        qrisCode: qrisReferenceNo,
+      };
+      localStorage.setItem('pos_customer_display_data', JSON.stringify(payload));
+      const ch = new BroadcastChannel('pos_customer_display');
+      ch.postMessage(payload);
+      ch.close();
+    } catch {}
+  }, [cart, subtotal, paymentMethod, isProcessing, selectedCustomer, customerName, qrisReferenceNo]);
 
   const cartSavings = useMemo(() => {
     return cart.reduce((sum, item) => {
@@ -1304,6 +1499,7 @@ export default function CashierPOS() {
       payAmount: Number(raw.payAmount ?? 0),
       changeAmount: Number(raw.changeAmount ?? 0),
       shiftId: raw.shiftId || '',
+      dueDate: raw.dueDate || d.due_date || null,
     };
   }, []);
 
@@ -2070,7 +2266,7 @@ export default function CashierPOS() {
 
     if (useBluetoothPrinter) {
       try {
-        const escReceipt = generateESCReceipt({ ...order, items: enrichedItems });
+        const escReceipt = generateESCReceipt({ ...order, items: enrichedItems }, printSettings);
         
         // Buka laci kasir jika pembayarannya TUNAI (CASH)
         if (order.paymentMethod === 'CASH') {
@@ -2109,15 +2305,15 @@ export default function CashierPOS() {
         <head>
           <title>Struk Belanja - ATAYATOKO</title>
           <style>
-            @page { size: 58mm auto; margin: 0; }
+            @page { size: ${printSettings.paperWidth} auto; margin: 0; }
             body { 
               font-family: 'Courier New', monospace; 
-              width: 58mm; 
+              width: ${printSettings.paperWidth}; 
               margin: 0; 
-              padding: 4px; 
-              font-size: 10px; 
+              padding: ${printSettings.ecoMode ? '2px' : '4px'}; 
+              font-size: ${printSettings.paperWidth === '80mm' ? '12px' : '10px'}; 
               color: black; 
-              line-height: 1.2;
+              line-height: ${printSettings.ecoMode ? '1.1' : '1.2'};
             }
             .text-center { text-align: center; }
             .text-right { text-align: right; }
@@ -2215,6 +2411,22 @@ export default function CashierPOS() {
             <span>${formatRp(changeAmount)}</span>
           </div>
           
+          ${String(order.paymentMethod || '').toUpperCase() === 'TEMPO' ? `
+          <div class="line"></div>
+          <div class="text-center bold" style="font-size: 11px;">NOTA BON GANTUNG (TEMPO)</div>
+          <div class="flex"><span>Jatuh Tempo:</span><span>${order.dueDate ? new Date(order.dueDate).toLocaleDateString('id-ID') : '-'}</span></div>
+          <div class="flex"><span>Status:</span><span class="bold">BELUM LUNAS</span></div>
+          <div style="margin-top: 24px; border-top: 1px dashed black; padding-top: 4px; text-align: center;">
+            <span style="font-size: 9px;">Tanda Tangan Pelanggan:</span><br><br><br>
+            <span>(___________________________)</span>
+          </div>` : ''}
+
+          ${printSettings.footerPromo ? `
+          <div class="line"></div>
+          <div class="text-center" style="font-size: 8.5px; font-weight: bold; padding: 2px 0;">
+            ${printSettings.footerPromo}
+          </div>` : ''}
+
           <div class="line"></div>
           <div class="footer">
             Terima Kasih atas Kunjungan Anda<br>
@@ -2306,6 +2518,28 @@ export default function CashierPOS() {
             <button onClick={() => setActiveTab('pos')} className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-xs font-bold uppercase transition-all ${activeTab === 'pos' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Kasir</button>
             <button onClick={() => setActiveTab('orders')} className={`px-3 md:px-4 py-1.5 rounded-md text-xs md:text-xs font-bold uppercase transition-all ${activeTab === 'orders' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}>Riwayat Order</button>
           </div>
+
+          {/* Tombol Retur Penjualan Cepat */}
+          <button
+            type="button"
+            onClick={() => setShowReturModal(true)}
+            className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-black border border-rose-200 uppercase flex items-center gap-1.5 transition-all shrink-0 shadow-2xs"
+            title="Retur Penjualan Cepat via No Struk"
+          >
+            <Undo2 size={13} />
+            <span className="hidden sm:inline">Retur Struk</span>
+          </button>
+
+          {/* Tombol Layar Pembeli (Customer Display) */}
+          <button
+            type="button"
+            onClick={() => window.open('/cashier/display', '_blank', 'width=1024,height=768')}
+            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-black uppercase flex items-center gap-1.5 transition-all shrink-0 shadow-2xs"
+            title="Buka Layar Pembeli (Customer Facing Display)"
+          >
+            <Monitor size={13} />
+            <span className="hidden sm:inline">Layar Pembeli</span>
+          </button>
 
           {/* Tombol Cetak Ulang Struk Terakhir [F12] */}
           {lastPrintedOrder && (
@@ -2961,17 +3195,28 @@ export default function CashierPOS() {
                         </div>
                       </div>
                       {editingPriceId === item.id ? (
-                        <input
-                          autoFocus
-                          type="number"
-                          className="w-24 p-1 text-xs font-black text-right border rounded outline-none focus:ring-2 focus:ring-green-500"
-                          value={editPriceValue}
-                          onChange={(e) => setEditPriceValue(e.target.value)}
-                          onBlur={() => updatePrice(item.id, parseFloat(editPriceValue) || 0, item.quantity)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') updatePrice(item.id, parseFloat(editPriceValue) || 0, item.quantity);
-                          }}
-                        />
+                        <div className="flex flex-col items-end">
+                          <input
+                            autoFocus
+                            type="number"
+                            className={`w-28 p-1 text-xs font-black text-right border rounded outline-none focus:ring-2 ${
+                              item.cost > 0 && (parseFloat(editPriceValue) || 0) / (item.quantity || 1) < item.cost
+                                ? 'border-red-400 bg-red-50 text-red-700 focus:ring-red-400'
+                                : 'focus:ring-green-500'
+                            }`}
+                            value={editPriceValue}
+                            onChange={(e) => setEditPriceValue(e.target.value)}
+                            onBlur={() => updatePrice(item.id, parseFloat(editPriceValue) || 0, item.quantity)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') updatePrice(item.id, parseFloat(editPriceValue) || 0, item.quantity);
+                            }}
+                          />
+                          {item.cost > 0 && (parseFloat(editPriceValue) || 0) / (item.quantity || 1) < item.cost && (
+                            <span className="text-[9px] font-black text-red-600 bg-red-100/90 px-1 py-0.5 rounded mt-0.5 shadow-2xs">
+                              ⚠️ Di bawah Modal! (HPP Rp{item.cost.toLocaleString('id-ID')})
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <div 
                           onClick={() => {
@@ -3013,11 +3258,12 @@ export default function CashierPOS() {
                         ><Minus size={12} /></button>
                         <input 
                           type="number" 
-                          min="1"
-                          className="w-10 text-center text-xs font-black bg-transparent outline-none p-0 appearance-none"
+                          step="any"
+                          min="0.001"
+                          className="w-12 text-center text-xs font-black bg-white rounded border border-gray-200 outline-none p-0.5 appearance-none focus:border-green-500"
                           value={item.quantity} 
                           onChange={(e) => {
-                            const val = parseInt(e.target.value);
+                            const val = parseFloat(e.target.value);
                             if (!isNaN(val) && val > 0) {
                               const prod = products.find(p => p.id === item.id);
                               const u = prod?.units?.find(u => u.code === item.unit);
@@ -3406,7 +3652,10 @@ export default function CashierPOS() {
                         <p className="text-sm font-black text-green-600">Rp{(order.total || 0).toLocaleString('id-ID')}</p>
                         <p className="text-[10px] font-bold text-gray-400 uppercase">{order.paymentMethod}</p>
                       </div>
-                      <button onClick={() => printReceipt(order)} className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 transition-colors">
+                      <button onClick={() => handleSendWhatsApp(order)} title="Kirim Struk via WhatsApp" className="p-2 hover:bg-emerald-50 rounded-xl text-gray-400 hover:text-emerald-600 transition-colors">
+                        <MessageCircle size={16} />
+                      </button>
+                      <button onClick={() => printReceipt(order)} title="Cetak Struk" className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 transition-colors">
                         <Printer size={16} />
                       </button>
                     </div>
@@ -3829,6 +4078,77 @@ export default function CashierPOS() {
                 </button>
               </div>
 
+              {/* Divider */}
+              <div className="border-t border-gray-100" />
+
+              {/* ── Ukuran Kertas Struk (58mm vs 80mm) ── */}
+              <div>
+                <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Ukuran Kertas Struk</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updatePrintSettings({ paperWidth: '58mm' })}
+                    className={`py-2 px-3 rounded-xl border text-xs font-black transition-all ${
+                      printSettings.paperWidth === '58mm'
+                        ? 'border-green-500 bg-green-50 text-green-700 shadow-xs'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    📄 58 mm (Standar)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updatePrintSettings({ paperWidth: '80mm' })}
+                    className={`py-2 px-3 rounded-xl border text-xs font-black transition-all ${
+                      printSettings.paperWidth === '80mm'
+                        ? 'border-green-500 bg-green-50 text-green-700 shadow-xs'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    📑 80 mm (Lebar)
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Eco Thermal Print (Hemat Kertas) ── */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-gray-800">Eco Thermal Print</p>
+                  <p className="text-xs text-gray-400">Kurangi spasi kosong agar hemat roll kertas</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => updatePrintSettings({ ecoMode: !printSettings.ecoMode })}
+                  className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${printSettings.ecoMode ? 'bg-green-500' : 'bg-gray-200'}`}
+                >
+                  <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${printSettings.ecoMode ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+
+              {/* ── Pesan Promosi di Footer Struk ── */}
+              <div>
+                <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1.5">Pesan Promosi Footer Struk</p>
+                <input
+                  type="text"
+                  value={printSettings.footerPromo}
+                  onChange={(e) => updatePrintSettings({ footerPromo: e.target.value })}
+                  placeholder="Contoh: Beli 3 DUS Diskon Ekstra! WA: 085853161174"
+                  className="w-full text-xs p-2.5 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-1 focus:ring-green-500"
+                />
+              </div>
+
+              {/* ── Customer Facing Display Shortcut ── */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => window.open('/cashier/display', '_blank', 'width=1024,height=768')}
+                  className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black uppercase flex items-center justify-center gap-2 transition-all shadow-sm"
+                >
+                  <Monitor size={15} />
+                  <span>Buka Layar Pembeli (/cashier/display)</span>
+                </button>
+              </div>
+
             </div>
 
             <div className="px-6 pb-6">
@@ -3838,6 +4158,181 @@ export default function CashierPOS() {
               >
                 Simpan & Tutup
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* ── MODAL RETUR PENJUALAN CEPAT ── */}
+      {showReturModal && (
+        <div className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-xl w-full overflow-hidden border border-gray-100 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="p-5 border-b flex items-center justify-between bg-rose-50/60">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-rose-100 text-rose-600 rounded-2xl">
+                  <Undo2 size={22} />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-gray-900 uppercase tracking-tight">Retur Penjualan Cepat</h3>
+                  <p className="text-xs text-gray-500">Cari nomor struk atau ID transaksi untuk memproses retur</p>
+                </div>
+              </div>
+              <button onClick={() => setShowReturModal(false)} className="p-1 text-gray-400 hover:text-gray-600 rounded-lg">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1 space-y-4">
+              {/* Search Box */}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={returSearch}
+                    onChange={(e) => setReturSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSearchReturOrder()}
+                    placeholder="Masukkan No. Struk (misal: 261121-0001) / ID..."
+                    className="w-full text-xs font-bold pl-9 pr-3 py-2.5 border rounded-xl outline-none focus:ring-2 focus:ring-rose-500"
+                  />
+                  <Search size={16} className="absolute left-3 top-3 text-gray-400" />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSearchReturOrder}
+                  disabled={returLoading}
+                  className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black uppercase transition-all disabled:opacity-60"
+                >
+                  {returLoading ? 'Mencari...' : 'Cari Struk'}
+                </button>
+              </div>
+
+              {/* Order Info & Items to Return */}
+              {returOrder && (
+                <div className="space-y-4 pt-2 border-t border-gray-100">
+                  <div className="bg-gray-50 p-3 rounded-2xl border border-gray-200 flex items-center justify-between text-xs">
+                    <div>
+                      <p className="font-black text-gray-800">
+                        No: {returOrder.raw_data?.receiptNo || `#${returOrder.id.slice(-8)}`}
+                      </p>
+                      <p className="text-gray-500 text-[11px]">
+                        Pelanggan: {returOrder.raw_data?.customerName || returOrder.customer_name || 'Umum'} • {returOrder.raw_data?.paymentMethod || 'CASH'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-gray-400 text-[10px] uppercase font-bold">Total Transaksi</p>
+                      <p className="text-sm font-black text-gray-900">Rp{Number(returOrder.total || 0).toLocaleString('id-ID')}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-gray-700 uppercase tracking-wider block mb-2">
+                      Pilih Item & Jumlah yang Diretur:
+                    </label>
+                    <div className="space-y-2 max-h-56 overflow-y-auto">
+                      {(Array.isArray(returOrder.items) ? returOrder.items : (returOrder.raw_data?.items || [])).map((it: any) => {
+                        const curQty = Number(returQuantities[it.id] || 0);
+                        const maxQty = Number(it.quantity || 1);
+                        return (
+                          <div key={it.id} className="p-3 bg-white border border-gray-200 rounded-xl flex items-center justify-between gap-3 shadow-2xs">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-gray-800 truncate">{formatProductName(it.name)}</p>
+                              <p className="text-[11px] text-gray-400">
+                                Beli: {maxQty} {it.unit || 'PCS'} @Rp{Number(it.price || 0).toLocaleString('id-ID')}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setReturQuantities(prev => ({ ...prev, [it.id]: Math.max(0, curQty - 1) }))}
+                                className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold"
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                min="0"
+                                max={maxQty}
+                                step="any"
+                                value={curQty}
+                                onChange={(e) => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setReturQuantities(prev => ({ ...prev, [it.id]: Math.min(maxQty, Math.max(0, val)) }));
+                                }}
+                                className="w-12 text-center text-xs font-black border rounded-lg py-1"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setReturQuantities(prev => ({ ...prev, [it.id]: Math.min(maxQty, curQty + 1) }))}
+                                className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Return Options */}
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-500 uppercase block mb-1">Metode Pengembalian Uang</label>
+                      <select
+                        value={returRefundMethod}
+                        onChange={(e) => setReturRefundMethod(e.target.value as any)}
+                        className="w-full text-xs font-bold p-2 bg-gray-50 border rounded-xl outline-none"
+                      >
+                        <option value="CASH">💵 Uang Tunai (Cash)</option>
+                        <option value="DOMPET">💳 Saldo Dompet Pelanggan</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-500 uppercase block mb-1">Alasan Retur</label>
+                      <input
+                        type="text"
+                        value={returReason}
+                        onChange={(e) => setReturReason(e.target.value)}
+                        placeholder="Alasan retur..."
+                        className="w-full text-xs font-medium p-2 bg-gray-50 border rounded-xl outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Total Refund Summary */}
+                  {(() => {
+                    const items = Array.isArray(returOrder.items) ? returOrder.items : (returOrder.raw_data?.items || []);
+                    const totalRefund = items.reduce((sum: number, it: any) => sum + (Number(it.price || 0) * Number(returQuantities[it.id] || 0)), 0);
+                    return (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between">
+                        <span className="text-xs font-bold text-rose-800">Total Nilai Retur / Refund:</span>
+                        <span className="text-base font-black text-rose-600">Rp{totalRefund.toLocaleString('id-ID')}</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t bg-gray-50 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowReturModal(false)}
+                className="flex-1 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold uppercase"
+              >
+                Tutup
+              </button>
+              {returOrder && (
+                <button
+                  type="button"
+                  onClick={handleExecuteRetur}
+                  disabled={isSubmittingRetur}
+                  className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black uppercase shadow-md shadow-rose-200 transition-all disabled:opacity-60"
+                >
+                  {isSubmittingRetur ? 'Memproses...' : 'Konfirmasi Retur & Kembalikan Stok'}
+                </button>
+              )}
             </div>
           </div>
         </div>
