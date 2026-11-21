@@ -223,10 +223,12 @@ export default function ProductSearchCombobox({
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-2.5 py-2 text-xs border border-gray-200 rounded-lg bg-gray-50 hover:bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer flex items-center justify-between gap-1 transition-all"
       >
-        <div className="flex-1 truncate flex items-center gap-1.5">
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
           {selectedProduct ? (
             <>
-              <span className="font-semibold text-gray-800 truncate">{selectedProduct.name}</span>
+              <span title={selectedProduct.name} className="font-semibold text-gray-800 truncate">
+                {selectedProduct.name}
+              </span>
               {selectedProduct.parentId && (
                 <span className="text-[9px] font-black uppercase bg-violet-50 text-violet-700 border border-violet-200 px-1 py-0.2 rounded shrink-0">
                   Varian
@@ -254,7 +256,7 @@ export default function ProductSearchCombobox({
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden min-w-[320px] max-w-lg">
+        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden w-full min-w-[340px] sm:min-w-[480px] md:min-w-[560px] max-w-2xl ring-1 ring-black/5">
           {/* Search Bar */}
           <div className="p-2 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
             <Search size={14} className="text-gray-400 ml-1 flex-shrink-0" />
@@ -279,7 +281,7 @@ export default function ProductSearchCombobox({
           </div>
 
           {/* List Options */}
-          <div className="max-h-64 overflow-y-auto divide-y divide-gray-50">
+          <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
             {topLevelProducts.length === 0 ? (
               <div className="p-4 text-center text-xs text-gray-400">
                 {isSearching ? 'Mencari ke database...' : 'Produk aktif tidak ditemukan'}
@@ -296,7 +298,7 @@ export default function ProductSearchCombobox({
                     {/* Parent Header / Standalone Item */}
                     <div
                       onClick={() => handleSelect(p)}
-                      className={`px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors ${
+                      className={`px-3 py-2.5 text-xs flex items-center justify-between gap-2.5 transition-colors ${
                         p.isParentOnly
                           ? 'bg-violet-50/50 cursor-default border-b border-violet-100/60'
                           : isSelected
@@ -305,47 +307,54 @@ export default function ProductSearchCombobox({
                       }`}
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-start gap-2">
                           {isParentGroup && (
-                            <span className="p-0.5 bg-violet-100 text-violet-700 rounded shrink-0">
-                              <Layers size={11} />
+                            <span className="p-1 bg-violet-100 text-violet-700 rounded-md shrink-0 mt-0.5">
+                              <Layers size={12} />
                             </span>
                           )}
-                          <p className={`truncate text-xs ${isParentGroup ? 'font-black text-slate-900' : 'font-semibold text-gray-800'}`}>
-                            {p.name}
-                          </p>
-                          {p.isParentOnly ? (
-                            <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-violet-100 text-violet-800 border border-violet-200">
-                              Induk (Non-Order)
-                            </span>
-                          ) : hasVariants ? (
-                            <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-violet-50 text-violet-700 border border-violet-100">
-                              Induk ({children.length} Varian)
-                            </span>
-                          ) : p.parentId ? (
-                            <span className="text-[9px] font-bold text-violet-700 bg-violet-50 px-1 py-0.2 rounded">
-                              ↳ Varian: {productById.get(p.parentId)?.name || p.parentId}
-                            </span>
-                          ) : null}
-                        </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <p
+                                title={p.name}
+                                className={`text-xs leading-snug break-words ${isParentGroup ? 'font-black text-slate-900' : 'font-semibold text-gray-800'}`}
+                              >
+                                {p.name}
+                              </p>
+                              {p.isParentOnly ? (
+                                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-800 border border-violet-200 shrink-0">
+                                  Induk (Non-Order)
+                                </span>
+                              ) : hasVariants ? (
+                                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 border border-violet-100 shrink-0">
+                                  Induk ({children.length} Varian)
+                                </span>
+                              ) : p.parentId ? (
+                                <span className="text-[9px] font-bold text-violet-700 bg-violet-50 px-1 py-0.5 rounded shrink-0">
+                                  ↳ Varian: {productById.get(p.parentId)?.name || p.parentId}
+                                </span>
+                              ) : null}
+                            </div>
 
-                        {/* Sub info */}
-                        <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5 flex-wrap">
-                          {p.sku && <span className="font-mono text-[10px] text-gray-500">#{p.sku}</span>}
-                          {p.barcode && <span className="font-mono bg-gray-100 text-[10px] px-1 py-0.2 rounded">{p.barcode}</span>}
-                          {!p.isParentOnly && p.purchasePrice !== undefined && Number(p.purchasePrice) > 0 && (
-                            <span className="text-emerald-600 font-medium">
-                              Modal: Rp{Number(p.purchasePrice).toLocaleString('id-ID')}
-                            </span>
-                          )}
-                          {!p.isParentOnly && p.stock !== undefined && (
-                            <span>Stok: {p.stock}</span>
-                          )}
-                          {p.isParentOnly && (
-                            <span className="text-violet-600 font-semibold text-[10px]">
-                              Pilih salah satu varian di bawah:
-                            </span>
-                          )}
+                            {/* Sub info */}
+                            <div className="flex items-center gap-2 text-xs text-gray-400 mt-1 flex-wrap">
+                              {p.sku && <span className="font-mono text-[10px] text-gray-500">#{p.sku}</span>}
+                              {p.barcode && <span className="font-mono bg-gray-100 text-[10px] px-1 py-0.5 rounded">{p.barcode}</span>}
+                              {!p.isParentOnly && p.purchasePrice !== undefined && Number(p.purchasePrice) > 0 && (
+                                <span className="text-emerald-600 font-medium">
+                                  Modal: Rp{Number(p.purchasePrice).toLocaleString('id-ID')}
+                                </span>
+                              )}
+                              {!p.isParentOnly && p.stock !== undefined && (
+                                <span>Stok: <strong className="text-gray-700">{p.stock}</strong></span>
+                              )}
+                              {p.isParentOnly && (
+                                <span className="text-violet-600 font-semibold text-[10px]">
+                                  Pilih salah satu varian di bawah:
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -357,7 +366,7 @@ export default function ProductSearchCombobox({
 
                     {/* Nested Children Variants */}
                     {hasVariants && (
-                      <div className="bg-slate-50/40 border-l-2 border-violet-300 ml-3.5 my-0.5 space-y-0.5">
+                      <div className="bg-slate-50/50 border-l-2 border-violet-300 ml-4 my-1 space-y-0.5">
                         {children.map((child) => {
                           const isChildSelected = child.id === value;
                           return (
@@ -367,44 +376,51 @@ export default function ProductSearchCombobox({
                                 e.stopPropagation();
                                 handleSelect(child);
                               }}
-                              className={`pl-5 pr-3 py-1.5 text-xs cursor-pointer flex items-center justify-between gap-2 transition-colors ${
+                              className={`pl-4 pr-3 py-2 text-xs cursor-pointer flex items-center justify-between gap-2.5 transition-colors ${
                                 isChildSelected
                                   ? 'bg-emerald-100/70 font-bold text-emerald-950'
-                                  : 'hover:bg-emerald-50 text-gray-700'
+                                  : 'hover:bg-emerald-50/90 text-gray-700'
                               }`}
                             >
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <CornerDownRight size={11} className="text-violet-500 shrink-0" />
-                                  <span className="font-bold text-xs text-gray-900 truncate">
-                                    {child.name}
-                                  </span>
-                                  {child.sku && (
-                                    <span className="font-mono text-[9px] text-gray-400">
-                                      #{child.sku}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-0.5 pl-4 flex-wrap">
-                                  {child.barcode && (
-                                    <span className="font-mono bg-white border border-gray-200 text-[10px] px-1 py-0.2 rounded">
-                                      {child.barcode}
-                                    </span>
-                                  )}
-                                  {child.purchasePrice !== undefined && Number(child.purchasePrice) > 0 && (
-                                    <span className="text-emerald-700 font-semibold">
-                                      Modal: Rp{Number(child.purchasePrice).toLocaleString('id-ID')}
-                                    </span>
-                                  )}
-                                  {child.stock !== undefined && (
-                                    <span>Stok: <strong className="text-gray-700">{child.stock}</strong> {child.unit || 'PCS'}</span>
-                                  )}
+                                <div className="flex items-start gap-2">
+                                  <CornerDownRight size={12} className="text-violet-500 shrink-0 mt-0.5" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-baseline gap-2 flex-wrap">
+                                      <span
+                                        title={child.name}
+                                        className="font-bold text-xs text-gray-900 leading-snug break-words"
+                                      >
+                                        {child.name}
+                                      </span>
+                                      {child.sku && (
+                                        <span className="font-mono text-[9px] text-gray-400 shrink-0">
+                                          #{child.sku}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-1 flex-wrap">
+                                      {child.barcode && (
+                                        <span className="font-mono bg-white border border-gray-200 text-[10px] px-1 py-0.5 rounded">
+                                          {child.barcode}
+                                        </span>
+                                      )}
+                                      {child.purchasePrice !== undefined && Number(child.purchasePrice) > 0 && (
+                                        <span className="text-emerald-700 font-semibold">
+                                          Modal: Rp{Number(child.purchasePrice).toLocaleString('id-ID')}
+                                        </span>
+                                      )}
+                                      {child.stock !== undefined && (
+                                        <span>Stok: <strong className="text-gray-700">{child.stock}</strong> {child.unit || 'PCS'}</span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                               {isChildSelected ? (
                                 <Check size={14} className="text-emerald-600 flex-shrink-0" />
                               ) : (
-                                <span className="text-[10px] font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-2 py-0.5 rounded border border-violet-200 shrink-0">
+                                <span className="text-[10px] font-bold text-violet-600 bg-violet-50 hover:bg-violet-100 px-2 py-1 rounded border border-violet-200 shrink-0">
                                   Pilih
                                 </span>
                               )}
