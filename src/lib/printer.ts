@@ -60,8 +60,12 @@ export const generateESCReceipt = (order: any): string => {
   
   // Info
   receipt += ALIGN_LEFT;
-  receipt += `Tgl: ${new Date().toLocaleString('id-ID')}\n`;
-  receipt += `No : #${(order.id || '').slice(-6).toUpperCase()}\n`;
+  const tglStr = order.createdAt 
+    ? (order.createdAt instanceof Date ? order.createdAt.toLocaleString('id-ID') : new Date(order.createdAt).toLocaleString('id-ID'))
+    : new Date().toLocaleString('id-ID');
+  const noStruk = order.receiptNo || (order.dailySeq ? `#${String(order.dailySeq).padStart(4, '0')}` : `#${(order.id || '').slice(-6).toUpperCase()}`);
+  receipt += `Tgl: ${tglStr}\n`;
+  receipt += `No : ${noStruk}\n`;
   receipt += `Plg: ${order.customerName || 'Umum'}\n`;
   receipt += '--------------------------------\n';
   
@@ -79,11 +83,14 @@ export const generateESCReceipt = (order: any): string => {
     receipt += `${i.name}\n`;
     const origPrice = Number(i.originalPrice || i.price || 0);
     const currPrice = Number(i.price || 0);
+    const qty = Number(i.quantity || 1);
+    const lineTotal = currPrice * qty;
     if (origPrice > currPrice) {
-      const itemSave = (origPrice - currPrice) * Number(i.quantity || 1);
-      receipt += `${i.quantity} x ${currPrice.toLocaleString('id-ID')} (Hemat ${itemSave.toLocaleString('id-ID')})   ${(currPrice * i.quantity).toLocaleString('id-ID')}\n`;
+      const itemSave = (origPrice - currPrice) * qty;
+      receipt += `${qty} x ${currPrice.toLocaleString('id-ID')} [Normal ${origPrice.toLocaleString('id-ID')}]   ${lineTotal.toLocaleString('id-ID')}\n`;
+      receipt += `  *Hemat Grosir: Rp ${itemSave.toLocaleString('id-ID')}\n`;
     } else {
-      receipt += `${i.quantity} x ${currPrice.toLocaleString('id-ID')}   ${(currPrice * i.quantity).toLocaleString('id-ID')}\n`;
+      receipt += `${qty} x ${currPrice.toLocaleString('id-ID')}   ${lineTotal.toLocaleString('id-ID')}\n`;
     }
   });
   

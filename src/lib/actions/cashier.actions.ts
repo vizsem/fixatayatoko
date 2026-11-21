@@ -31,6 +31,7 @@ export type ItemKasirInput = {
   id: string
   name?: string
   price?: number
+  originalPrice?: number
   quantity: number
   unit?: string
   contains?: number
@@ -40,6 +41,8 @@ export type ItemKasirInput = {
 
 export type TransaksiKasirInput = {
   orderId: string
+  receiptNo?: string
+  dailySeq?: number
   items: ItemKasirInput[]
   subtotal: number
   shippingCost?: number
@@ -65,6 +68,8 @@ export type TransaksiKasirResult = {
   error?: string
   data?: {
     orderId: string
+    receiptNo?: string
+    dailySeq?: number
     items: Array<{ productId: string; newStock: number; newStockByWarehouse: Record<string, number> }>
     hppTotal: number
     itemTanpaModal: number
@@ -130,6 +135,7 @@ export async function simpanTransaksiKasir(data: TransaksiKasirInput): Promise<T
         id: String(it.id),
         name: produk?.name || it.name || `Produk ${it.id}`,
         price: Number(it.price || 0),
+        originalPrice: Number(it.originalPrice ?? it.price ?? 0),
         quantity,
         unit: it.unit || produk?.unit || 'PCS',
         contains,
@@ -208,7 +214,25 @@ export async function simpanTransaksiKasir(data: TransaksiKasirInput): Promise<T
 
     const status = data.status || (String(data.paymentMethod).toUpperCase() === 'TEMPO' ? 'BELUM_LUNAS' : 'SELESAI')
 
+    // Hitung nomor urut harian di server
+    const today = new Date(now)
+    today.setHours(0, 0, 0, 0)
+    const todayStartIso = today.toISOString()
+
+    const { count: countHariIni } = await supabaseAdmin
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', todayStartIso)
+
+    const dailySeq = Number(data.dailySeq || (countHariIni || 0) + 1)
+    const yy = String(today.getFullYear()).slice(-2)
+    const mm = String(today.getMonth() + 1).padStart(2, '0')
+    const dd = String(today.getDate()).padStart(2, '0')
+    const receiptNo = data.receiptNo || `${yy}${mm}${dd}-${String(dailySeq).padStart(4, '0')}`
+
     const raw_data = {
+      receiptNo,
+      dailySeq,
       customerName: data.customerName || 'Pelanggan Toko',
       customerPhone: data.customerPhone || '',
       items: itemSiap,
@@ -335,7 +359,7 @@ export async function simpanTransaksiKasir(data: TransaksiKasirInput): Promise<T
 
     return {
       success: true,
-      data: { orderId, items: hasilDeduction, hppTotal, itemTanpaModal },
+      data: { orderId, receiptNo, dailySeq, items: hasilDeduction, hppTotal, itemTanpaModal },
     }
   } catch (error: any) {
     console.error('simpanTransaksiKasir error:', error)
