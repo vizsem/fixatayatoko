@@ -8,7 +8,7 @@ import {
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
   History, X, Trash2, LayoutGrid, List, AlignJustify, Edit, ShoppingBag, Camera, User,
   Settings, Zap, ScanLine, PauseCircle, PlayCircle, RotateCcw, Layers, CornerDownRight,
-  MessageCircle, Monitor, Undo2, AlertTriangle, FileText, Percent
+  MessageCircle, Monitor, Undo2, AlertTriangle, FileText, Percent, UserPlus, UserCheck, Store, Phone
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
@@ -247,9 +247,19 @@ export default function CashierPOS() {
   const [warehouses, setWarehouses] = useState<{ id: string; name: string }[]>([]);
 
   // State untuk Wallet & Customer Tier
-  const [selectedCustomer, setSelectedCustomer] = useState<{id: string, name: string, walletBalance: number, customerType?: string} | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<{id: string, name: string, phone?: string, walletBalance: number, customerType?: string} | null>(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [customerResults, setCustomerResults] = useState<Array<{id: string, name: string, phone: string, walletBalance?: number, customerType?: string}>>([]);
+
+  // State Quick Customer Modal (Wajib untuk Warung & Partai)
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [customerModalTab, setCustomerModalTab] = useState<'search' | 'create'>('search');
+  const [newCustName, setNewCustName] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+  const [newCustType, setNewCustType] = useState<'Retail' | 'Semi-Grosir' | 'Grosir'>('Semi-Grosir');
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+  const [recentCustomers, setRecentCustomers] = useState<Array<{id: string, name: string, phone: string, walletBalance?: number, customerType?: string}>>([]);
+  const [isLoadingRecentCustomers, setIsLoadingRecentCustomers] = useState(false);
 
   // Shift States
   const [currentShift, setCurrentShift] = useState<CashierShift | null>(null);
@@ -1009,30 +1019,168 @@ Tetap lanjutkan menyimpan harga ini?`
     return 0;
   }, [cashGiven, total, paymentMethod]);
 
-  // Search Customer for Wallet - query customers table (raw_data JSONB)
+  // Fetch recent customers for quick picker
+  const loadRecentCustomers = useCallback(async () => {
+    setIsLoadingRecentCustomers(true);
+    try {
+      const { data: rows } = await supabase
+        .from('customers')
+        .select('id, name, phone, type, raw_data')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      const results = (rows || []).map((c: any) => {
+        const raw = c.raw_data || {};
+        return {
+          id: c.id,
+          name: c.name || raw.name || 'Tanpa Nama',
+          phone: c.phone || raw.phone || '',
+          walletBalance: Number(raw.walletBalance || raw.wallet_balance || 0),
+          customerType: c.type || raw.customerType || raw.type || raw.tipe || 'Retail',
+        };
+      });
+      setRecentCustomers(results);
+    } catch (err) {
+      console.error('Customer fetch error:', err);
+    } finally {
+      setIsLoadingRecentCustomers(false);
+    }
+  }, []);
+
+  // Handler Select Customer from list
+  const handleSelectCustomer = useCallback((c: { id: string; name: string; phone?: string; walletBalance?: number; customerType?: string }) => {
+    setSelectedCustomer({
+      id: c.id,
+      name: c.name,
+      phone: c.phone || '',
+      walletBalance: c.walletBalance || 0,
+      customerType: c.customerType || 'Retail',
+    });
+    setCustomerName(c.name);
+    setCustomerPhone(c.phone || '');
+    setCustomerSearch(c.name);
+    setCustomerResults([]);
+    setShowCustomerModal(false);
+
+    // Otomatis sinkronkan tarif harga jika pelanggan adalah Warung / Partai
+    if (c.customerType === 'Semi-Grosir') {
+      setCustomerPriceTier('Semi-Grosir');
+      toast.success(`Pelanggan: ${c.name} (Tarif Warung aktif)`);
+    } else if (c.customerType === 'Grosir') {
+      setCustomerPriceTier('Grosir');
+      toast.success(`Pelanggan: ${c.name} (Tarif Partai aktif)`);
+    } else {
+      toast.success(`Pelanggan: ${c.name}`);
+    }
+  }, []);
+
+  // Handler Quick Create Customer to DB
+  const handleQuickCreateCustomer = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanName = newCustName.trim();
+    if (!cleanName) {
+      toast.error('Nama pelanggan wajib diisi!');
+      return;
+    }
+    setIsSavingCustomer(true);
+    try {
+      const now = new Date().toISOString();
+      const id = `cust_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const cleanPhone = newCustPhone.trim();
+      const raw_data = {
+        name: cleanName,
+        phone: cleanPhone || null,
+        type: newCustType,
+        customerType: newCustType,
+        createdAt: now,
+        updatedAt: now,
+        walletBalance: 0,
+      };
+
+      const { error } = await supabase.from('customers').insert({
+        id,
+        name: cleanName,
+        phone: cleanPhone || null,
+        type: newCustType,
+        raw_data,
+        created_at: now,
+        updated_at: now,
+      });
+
+      if (error) {
+        console.warn('Supabase customers insert note:', error);
+      }
+
+      setSelectedCustomer({
+        id,
+        name: cleanName,
+        phone: cleanPhone,
+        walletBalance: 0,
+        customerType: newCustType,
+      });
+      setCustomerName(cleanName);
+      setCustomerPhone(cleanPhone);
+
+      if (newCustType === 'Semi-Grosir' || newCustType === 'Grosir') {
+        setCustomerPriceTier(newCustType);
+      }
+
+      setNewCustName('');
+      setNewCustPhone('');
+      setShowCustomerModal(false);
+      toast.success(`Pelanggan "${cleanName}" berhasil ditambahkan & dipilih!`);
+    } catch (err: any) {
+      console.error('Failed to create customer:', err);
+      toast.error('Gagal membuat pelanggan: ' + (err?.message || 'Error'));
+    } finally {
+      setIsSavingCustomer(false);
+    }
+  };
+
+  // Handler Use Name Only on Nota without saving to contact DB
+  const handleUseNameOnly = () => {
+    const cleanName = (newCustName || customerSearch).trim();
+    if (!cleanName) {
+      toast.error('Ketik nama pelanggan terlebih dahulu!');
+      return;
+    }
+    const cleanPhone = newCustPhone.trim();
+    setSelectedCustomer({
+      id: `temp_${Date.now()}`,
+      name: cleanName,
+      phone: cleanPhone,
+      walletBalance: 0,
+      customerType: customerPriceTier,
+    });
+    setCustomerName(cleanName);
+    setCustomerPhone(cleanPhone);
+    setShowCustomerModal(false);
+    toast.success(`Nama pelanggan di nota: ${cleanName}`);
+  };
+
+  // Search Customer - query customers table
   useEffect(() => {
-    if (customerSearch.length < 3) {
+    if (customerSearch.trim().length === 0) {
       setCustomerResults([]);
       return;
     }
     const performSearch = async () => {
       try {
-        const term = customerSearch.toLowerCase();
-        // customers table stores name/phone inside raw_data JSONB
+        const term = customerSearch.trim().toLowerCase();
         const { data: rows } = await supabase
           .from('customers')
-          .select('id, raw_data')
-          .or(`raw_data->>name.ilike.%${term}%,raw_data->>phone.ilike.%${term}%`)
-          .limit(10);
+          .select('id, name, phone, type, raw_data')
+          .or(`name.ilike.%${term}%,phone.ilike.%${term}%,raw_data->>name.ilike.%${term}%,raw_data->>phone.ilike.%${term}%`)
+          .limit(15);
 
         const results = (rows || []).map((c: any) => {
           const raw = c.raw_data || {};
           return {
             id: c.id,
-            name: raw.name || 'Tanpa Nama',
-            phone: raw.phone || '',
+            name: c.name || raw.name || 'Tanpa Nama',
+            phone: c.phone || raw.phone || '',
             walletBalance: Number(raw.walletBalance || raw.wallet_balance || 0),
-            customerType: raw.customerType || raw.type || raw.tipe || 'Retail',
+            customerType: c.type || raw.customerType || raw.type || raw.tipe || 'Retail',
           };
         });
         setCustomerResults(results);
@@ -1041,7 +1189,7 @@ Tetap lanjutkan menyimpan harga ini?`
         setCustomerResults([]);
       }
     };
-    const debounce = setTimeout(performSearch, 300);
+    const debounce = setTimeout(performSearch, 200);
     return () => clearTimeout(debounce);
   }, [customerSearch]);
 
@@ -2052,12 +2200,25 @@ Tetap lanjutkan menyimpan harga ini?`
   const handleTransaction = async () => {
     if (!currentShift) return toast.error('Kasir belum dibuka!');
     if (cart.length === 0) return;
+
+    // Validasi Wajib Nama Pelanggan untuk Transaksi Warung & Partai
+    const effectiveCustomerType = selectedCustomer?.customerType || customerPriceTier;
+    const isGrosirOrWarung = effectiveCustomerType === 'Semi-Grosir' || effectiveCustomerType === 'Grosir' || customerPriceTier === 'Semi-Grosir' || customerPriceTier === 'Grosir';
+    const activeCustomerName = (selectedCustomer?.name || customerName).trim();
+    if (isGrosirOrWarung && !activeCustomerName) {
+      toast.error('⚠️ Wajib mengisi Nama Pelanggan di nota untuk transaksi Warung / Partai!');
+      setNewCustType(customerPriceTier === 'Grosir' ? 'Grosir' : 'Semi-Grosir');
+      setShowCustomerModal(true);
+      loadRecentCustomers();
+      return;
+    }
+
     // QRIS Dinamis (sudah dikonfirmasi via BRI SNAP) tidak perlu upload bukti manual
     if (paymentMethod === 'QRIS' && !qrisConfirmedRef.current && !paymentProof && !isOffline) return toast.error('Bayar via QRIS terlebih dahulu atau upload bukti!');
     if (paymentMethod === 'TRANSFER' && !paymentProof && !isOffline) return toast.error('Wajib upload bukti transfer!');
     if (paymentMethod === 'CASH' && change < 0) return toast.error('Uang kurang!');
     if (paymentMethod === 'TEMPO') {
-      if (!customerName || !customerPhone || !tempoDueDate) return toast.error('Data pelanggan & jatuh tempo wajib diisi untuk transaksi TEMPO!');
+      if (!activeCustomerName || !customerPhone || !tempoDueDate) return toast.error('Data pelanggan & jatuh tempo wajib diisi untuk transaksi TEMPO!');
     }
     if (paymentMethod === 'DOMPET') {
       if (!selectedCustomer) return toast.error('Pilih pelanggan terlebih dahulu!');
@@ -2106,9 +2267,12 @@ Tetap lanjutkan menyimpan harga ini?`
       const dd = String(todayDate.getDate()).padStart(2, '0');
       const clientReceiptNo = `${yy}${mm}${dd}-${(completedOrders.length + 1).toString().padStart(4, '0')}`;
 
+      const resolvedCustomerName = activeCustomerName || (paymentMethod === 'TEMPO' ? customerName : (transactionType === 'online' ? 'Pelanggan Online' : 'Pelanggan Toko'));
+      const resolvedCustomerPhone = (selectedCustomer?.phone || customerPhone).trim();
+
       const orderData = {
-        customerName: paymentMethod === 'TEMPO' ? customerName : (paymentMethod === 'DOMPET' ? selectedCustomer?.name : (transactionType === 'online' ? 'Pelanggan Online' : 'Pelanggan Toko')),
-        customerPhone: paymentMethod === 'TEMPO' ? customerPhone : '',
+        customerName: resolvedCustomerName,
+        customerPhone: resolvedCustomerPhone,
         items: cart,
         subtotal, shippingCost, total,
         paymentMethod, paymentProofUrl: proofUrl,
@@ -2116,7 +2280,7 @@ Tetap lanjutkan menyimpan harga ini?`
         status: paymentMethod === 'TEMPO' ? 'BELUM_LUNAS' : 'SELESAI',
         dueDate: paymentMethod === 'TEMPO' ? new Date(tempoDueDate).toISOString() : null,
         createdAt: now,
-        userId: paymentMethod === 'DOMPET' ? selectedCustomer?.id : null,
+        userId: selectedCustomer?.id && !selectedCustomer.id.startsWith('temp_') ? selectedCustomer.id : null,
         payAmount: finalPayAmount,
         changeAmount: finalChange,
         shiftId: currentShift.id,
@@ -3240,6 +3404,11 @@ Tetap lanjutkan menyimpan harga ini?`
                         };
                       }));
                       toast.success('Tarif: Semi-Grosir (Warung)');
+                      if (!selectedCustomer && !customerName.trim()) {
+                        setNewCustType('Semi-Grosir');
+                        setShowCustomerModal(true);
+                        loadRecentCustomers();
+                      }
                     }}
                     className={`py-1.5 px-1 rounded-lg text-center transition-all ${
                       customerPriceTier === 'Semi-Grosir'
@@ -3273,6 +3442,11 @@ Tetap lanjutkan menyimpan harga ini?`
                         };
                       }));
                       toast.success('Tarif: Grosir (Partai)');
+                      if (!selectedCustomer && !customerName.trim()) {
+                        setNewCustType('Grosir');
+                        setShowCustomerModal(true);
+                        loadRecentCustomers();
+                      }
                     }}
                     className={`py-1.5 px-1 rounded-lg text-center transition-all ${
                       customerPriceTier === 'Grosir'
@@ -3283,6 +3457,113 @@ Tetap lanjutkan menyimpan harga ini?`
                     📦 Partai
                   </button>
                 </div>
+              </div>
+
+              {/* Info & Pemilihan Pelanggan (Wajib untuk Warung & Partai) */}
+              <div className="px-4 pb-2">
+                {selectedCustomer || customerName.trim() ? (
+                  <div className="flex items-center justify-between p-2.5 bg-emerald-50/90 border border-emerald-200 rounded-2xl shadow-xs">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <UserCheck size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-xs font-black text-gray-900 truncate">
+                            {selectedCustomer?.name || customerName}
+                          </p>
+                          <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                            (selectedCustomer?.customerType || customerPriceTier) === 'Grosir'
+                              ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                              : (selectedCustomer?.customerType || customerPriceTier) === 'Semi-Grosir'
+                              ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                          }`}>
+                            {(selectedCustomer?.customerType || customerPriceTier) === 'Grosir' ? 'Partai' : (selectedCustomer?.customerType || customerPriceTier) === 'Semi-Grosir' ? 'Warung' : 'Umum'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 truncate">
+                          {selectedCustomer?.phone || customerPhone || 'Tanpa no. HP'} • <span className="text-emerald-700 font-semibold">Tercetak di Nota</span>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomerModalTab('search');
+                          setShowCustomerModal(true);
+                          loadRecentCustomers();
+                        }}
+                        className="text-[10px] font-bold text-emerald-700 bg-white hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200 shadow-2xs"
+                      >
+                        Ganti
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCustomer(null);
+                          setCustomerName('');
+                          setCustomerPhone('');
+                          setCustomerSearch('');
+                        }}
+                        className="text-gray-400 hover:text-red-500 p-1"
+                        title="Hapus Pelanggan"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerModalTab('search');
+                      setNewCustType(customerPriceTier === 'Grosir' ? 'Grosir' : customerPriceTier === 'Semi-Grosir' ? 'Semi-Grosir' : 'Retail');
+                      setShowCustomerModal(true);
+                      loadRecentCustomers();
+                    }}
+                    className={`w-full flex items-center justify-between p-2.5 rounded-2xl border transition-all text-left ${
+                      customerPriceTier === 'Semi-Grosir' || customerPriceTier === 'Grosir'
+                        ? 'bg-rose-50 border-rose-300 hover:bg-rose-100/80 text-rose-800 shadow-xs ring-2 ring-rose-200/50'
+                        : 'bg-gray-50 border-dashed border-gray-300 hover:bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                        customerPriceTier === 'Semi-Grosir' || customerPriceTier === 'Grosir'
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-gray-200 text-gray-500'
+                      }`}>
+                        <UserPlus size={16} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold leading-tight flex items-center gap-1.5">
+                          {customerPriceTier === 'Semi-Grosir' || customerPriceTier === 'Grosir' ? (
+                            <>
+                              <span className="font-black text-rose-700">⚠️ WAJIB ISI PELANGGAN</span>
+                              <span className="text-[9px] bg-rose-200 text-rose-900 px-1 py-0.2 rounded font-black">NOTA</span>
+                            </>
+                          ) : (
+                            <span>👤 Pelanggan: Umum / Kasir</span>
+                          )}
+                        </p>
+                        <p className="text-[10px] text-gray-400">
+                          {customerPriceTier === 'Semi-Grosir' || customerPriceTier === 'Grosir'
+                            ? 'Nama pelanggan wajib tercetak di nota Warung/Partai'
+                            : 'Klik untuk cari dari daftar atau tambah baru'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-xl shrink-0 ${
+                      customerPriceTier === 'Semi-Grosir' || customerPriceTier === 'Grosir'
+                        ? 'bg-rose-600 text-white shadow-2xs'
+                        : 'bg-white border border-gray-200 text-gray-600 shadow-2xs'
+                    }`}>
+                      + Pilih / Tambah
+                    </span>
+                  </button>
+                )}
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3" data-testid="cart-items-container">
@@ -4075,6 +4356,326 @@ Tetap lanjutkan menyimpan harga ini?`
         <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4" onClick={() => setShowChatModal(false)}>
           <div className="bg-white w-full max-w-6xl h-[85vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
              <AdminChatInterface onClose={() => setShowChatModal(false)} isModal={true} />
+          </div>
+        </div>
+      )}
+
+      {/* ===== QUICK CUSTOMER MODAL (Wajib untuk Warung & Partai) ===== */}
+      {showCustomerModal && (
+        <div
+          className="fixed inset-0 z-[115] bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4"
+          onClick={() => setShowCustomerModal(false)}
+        >
+          <div
+            className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 text-purple-700 rounded-2xl flex items-center justify-center shadow-2xs">
+                  <UserPlus size={20} />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-gray-800 tracking-tight flex items-center gap-1.5">
+                    Nama Pelanggan di Nota
+                    {(customerPriceTier === 'Semi-Grosir' || customerPriceTier === 'Grosir') && (
+                      <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.2 rounded font-black border border-rose-200 uppercase">
+                        Wajib
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-xs text-gray-400">Pilih dari daftar atau tambah baru cepat</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCustomerModal(false)}
+                className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 text-gray-500 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Tab Navigasi */}
+            <div className="p-3 bg-gray-100/60 border-b border-gray-100">
+              <div className="grid grid-cols-2 gap-1 p-1 bg-gray-200/60 rounded-2xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomerModalTab('search');
+                    loadRecentCustomers();
+                  }}
+                  className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                    customerModalTab === 'search'
+                      ? 'bg-white text-gray-900 shadow-xs font-black'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Search size={14} />
+                  <span>Cari dari Daftar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCustomerModalTab('create')}
+                  className={`py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                    customerModalTab === 'create'
+                      ? 'bg-purple-600 text-white shadow-xs font-black'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Plus size={14} />
+                  <span>+ Tambah Baru Cepat</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {customerModalTab === 'search' ? (
+                <>
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                      type="text"
+                      autoFocus
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      placeholder="Ketik nama warung / toko / no. HP..."
+                      className="w-full pl-10 pr-9 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-xs"
+                    />
+                    {customerSearch && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomerSearch('');
+                          setCustomerResults([]);
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* List Hasil Pencarian atau Daftar Terbaru */}
+                  <div className="space-y-1.5 pt-1">
+                    {customerResults.length > 0 ? (
+                      <>
+                        <p className="text-[11px] font-black text-gray-400 uppercase tracking-wider px-1">
+                          Hasil Pencarian ({customerResults.length})
+                        </p>
+                        {customerResults.map((c) => (
+                          <div
+                            key={c.id}
+                            onClick={() => handleSelectCustomer(c)}
+                            className="p-3 bg-gray-50 hover:bg-purple-50 border border-gray-100 hover:border-purple-200 rounded-2xl cursor-pointer transition-all flex items-center justify-between group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                                <Store size={15} />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-gray-900 truncate group-hover:text-purple-700">
+                                  {c.name}
+                                </p>
+                                <p className="text-[10px] text-gray-400 truncate">
+                                  {c.phone || 'Tanpa No. HP'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                c.customerType === 'Grosir'
+                                  ? 'bg-purple-100 text-purple-700'
+                                  : c.customerType === 'Semi-Grosir'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-gray-200 text-gray-700'
+                              }`}>
+                                {c.customerType === 'Grosir' ? 'Partai' : c.customerType === 'Semi-Grosir' ? 'Warung' : 'Umum'}
+                              </span>
+                              <span className="text-[10px] font-bold text-purple-600 bg-white group-hover:bg-purple-600 group-hover:text-white px-2.5 py-1 rounded-xl border border-purple-200 transition-colors">
+                                Pilih
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    ) : customerSearch.trim() ? (
+                      <div className="p-4 text-center space-y-3 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                        <p className="text-xs text-gray-500">
+                          Tidak ditemukan pelanggan dengan nama <strong>"{customerSearch}"</strong>
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewCustName(customerSearch);
+                              setCustomerModalTab('create');
+                            }}
+                            className="px-3 py-2 bg-purple-600 text-white rounded-xl text-xs font-black hover:bg-purple-700 transition-colors shadow-xs"
+                          >
+                            + Daftarkan "{customerSearch}"
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleUseNameOnly}
+                            className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-xl text-xs font-bold transition-colors"
+                          >
+                            ⚡ Pakai untuk Nota Saja
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between px-1">
+                          <p className="text-[11px] font-black text-gray-400 uppercase tracking-wider">
+                            Pelanggan Terdaftar / Baru
+                          </p>
+                          {isLoadingRecentCustomers && (
+                            <span className="text-[10px] text-gray-400 animate-pulse">Memuat...</span>
+                          )}
+                        </div>
+                        {recentCustomers.length > 0 ? (
+                          recentCustomers.map((c) => (
+                            <div
+                              key={c.id}
+                              onClick={() => handleSelectCustomer(c)}
+                              className="p-3 bg-gray-50 hover:bg-purple-50 border border-gray-100 hover:border-purple-200 rounded-2xl cursor-pointer transition-all flex items-center justify-between group"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-gray-200 group-hover:bg-purple-600 group-hover:text-white text-gray-600 flex items-center justify-center shrink-0 transition-colors">
+                                  <Store size={15} />
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-black text-gray-900 truncate group-hover:text-purple-700">
+                                    {c.name}
+                                  </p>
+                                  <p className="text-[10px] text-gray-400 truncate">
+                                    {c.phone || 'Tanpa No. HP'}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                  c.customerType === 'Grosir'
+                                    ? 'bg-purple-100 text-purple-700'
+                                    : c.customerType === 'Semi-Grosir'
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-gray-200 text-gray-700'
+                                }`}>
+                                  {c.customerType === 'Grosir' ? 'Partai' : c.customerType === 'Semi-Grosir' ? 'Warung' : 'Umum'}
+                                </span>
+                                <span className="text-[10px] font-bold text-purple-600 bg-white group-hover:bg-purple-600 group-hover:text-white px-2.5 py-1 rounded-xl border border-purple-200 transition-colors">
+                                  Pilih
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-4 text-center text-xs text-gray-400 bg-gray-50 rounded-2xl">
+                            Belum ada riwayat pelanggan. Ketik nama untuk mencari atau klik tab "+ Tambah Baru".
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                /* Tab Tambah Pelanggan Baru */
+                <form onSubmit={handleQuickCreateCustomer} className="space-y-3.5">
+                  <div>
+                    <label className="text-xs font-black text-gray-700 uppercase tracking-tight block mb-1">
+                      Nama Pelanggan / Nama Warung <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      autoFocus
+                      required
+                      value={newCustName}
+                      onChange={(e) => setNewCustName(e.target.value)}
+                      placeholder="Contoh: Warung Bu Siti / Toko Barokah"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-gray-700 uppercase tracking-tight block mb-1">
+                      No. WhatsApp / HP <span className="text-gray-400 font-normal">(Opsional)</span>
+                    </label>
+                    <div className="relative">
+                      <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                      <input
+                        type="tel"
+                        value={newCustPhone}
+                        onChange={(e) => setNewCustPhone(e.target.value)}
+                        placeholder="Contoh: 08123456789"
+                        className="w-full pl-10 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-bold text-gray-800 placeholder-gray-400 outline-none focus:ring-2 focus:ring-purple-500 transition-all shadow-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-black text-gray-700 uppercase tracking-tight block mb-1.5">
+                      Kategori Tarif Pelanggan
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5 p-1 bg-gray-100 rounded-2xl text-xs font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setNewCustType('Retail')}
+                        className={`py-2 px-1 rounded-xl text-center transition-all ${
+                          newCustType === 'Retail'
+                            ? 'bg-white text-gray-900 shadow-xs font-black'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        👤 Umum
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewCustType('Semi-Grosir')}
+                        className={`py-2 px-1 rounded-xl text-center transition-all ${
+                          newCustType === 'Semi-Grosir'
+                            ? 'bg-emerald-600 text-white shadow-xs font-black'
+                            : 'text-emerald-700 hover:bg-emerald-50'
+                        }`}
+                      >
+                        🏪 Warung
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setNewCustType('Grosir')}
+                        className={`py-2 px-1 rounded-xl text-center transition-all ${
+                          newCustType === 'Grosir'
+                            ? 'bg-purple-600 text-white shadow-xs font-black'
+                            : 'text-purple-700 hover:bg-purple-50'
+                        }`}
+                      >
+                        📦 Partai
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 space-y-2">
+                    <button
+                      type="submit"
+                      disabled={isSavingCustomer || !newCustName.trim()}
+                      className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md flex items-center justify-center gap-2"
+                    >
+                      {isSavingCustomer ? 'Menyimpan...' : '⚡ Simpan & Pilih Pelanggan'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleUseNameOnly}
+                      disabled={!newCustName.trim()}
+                      className="w-full py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded-2xl text-xs font-bold transition-all text-center"
+                    >
+                      📝 Gunakan untuk Nota Saja (Tanpa Simpan Kontak)
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}
