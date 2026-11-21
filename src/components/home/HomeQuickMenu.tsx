@@ -31,27 +31,12 @@ import {
   Package,
 } from 'lucide-react';
 import { Category } from '@/lib/types';
+import { cleanCategoryName, toCategorySlug, EXCLUDED_CATEGORY_NAMES } from '@/lib/format';
 
 interface HomeQuickMenuProps {
   activeCategories: Category[];
   brands: string[];
 }
-
-/** Strip kode angka dari nama kategori, misal: "Kopi (700612)" → "Kopi" */
-function cleanCategoryName(name: string): string {
-  return name
-    .replace(/\s*\(\d+\)\s*$/, '') // hapus (angka) di akhir
-    .replace(/\s*\(\d{5,}\s*[-\w]*\)\s*$/, '') // hapus kode panjang
-    .trim();
-}
-
-/** Ambil slug bersih dari slug kategori (hapus kode angka di akhir) */
-function cleanSlug(slug: string): string {
-  return slug.replace(/-\d{5,}(-[a-z]+)?-?$/, '').replace(/-+$/, '') || slug;
-}
-
-/** Daftar kategori yang dikecualikan dari quick menu (terlalu generik / admin) */
-const EXCLUDED_NAMES = new Set(['semua', 'umum', 'pokok', 'lainnya', 'other', 'others', 'produk', 'all']);
 
 /** Map nama kategori (lowercase keyword) → emoji icon modern */
 function getCategoryEmoji(name: string): string {
@@ -126,16 +111,14 @@ export default function HomeQuickMenu({ activeCategories, brands }: HomeQuickMen
       const cleanName = cleanCategoryName(cat.name);
       const key = cleanName.toLowerCase().trim();
       // Skip kategori generik/admin
-      if (EXCLUDED_NAMES.has(key)) continue;
-      // Jika sudah ada versi bersih (tanpa kode), skip yang berkode
+      if (EXCLUDED_CATEGORY_NAMES.has(key)) continue;
+      const cleanSlug = toCategorySlug(cleanName);
       if (!seen.has(key)) {
-        seen.set(key, { ...cat, cleanName, cleanSlug: cleanSlug(cat.slug) });
+        seen.set(key, { ...cat, cleanName, cleanSlug });
       } else {
-        // Prefer yang namanya sudah bersih (tidak ada kode angka)
         const existing = seen.get(key)!;
         if (cleanName === cat.name && existing.cleanName !== cat.name) {
-          // versi baru lebih bersih, ganti
-          seen.set(key, { ...cat, cleanName, cleanSlug: cleanSlug(cat.slug) });
+          seen.set(key, { ...cat, cleanName, cleanSlug });
         }
       }
     }

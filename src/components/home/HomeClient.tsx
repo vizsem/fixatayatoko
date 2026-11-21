@@ -98,14 +98,11 @@ export default function HomeClient({
     for (const cat of categories) {
       const key = (cat.name || '').trim().toLowerCase();
       if (!key || seen.has(key)) continue;
-      const hasProducts = products.some((p) => (p.category || '').trim().toLowerCase() === key);
-      if (hasProducts) {
-        seen.add(key);
-        result.push(cat);
-      }
+      seen.add(key);
+      result.push(cat);
     }
     return result;
-  }, [categories, products]);
+  }, [categories]);
 
   // Jumlah kategori yang ditampilkan bertahap (default 4 agar proporsional dan tidak kepanjangan)
   const [visibleCatCount, setVisibleCatCount] = useState<number>(4);

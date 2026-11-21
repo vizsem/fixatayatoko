@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { Store, Package, ArrowLeft, Loader2 } from 'lucide-react';
 import { ChipFilter, ChipKey } from '@/components/ChipFilter';
 import { supabase } from '@/lib/supabase';
-import { sbGetDocs } from '@/lib/supabase-helpers';
+import { cleanCategoryName, toCategorySlug, EXCLUDED_CATEGORY_NAMES } from '@/lib/format';
+
 export default function AllCategoriesPage() {
-  const [categories, setCategories] = useState<{ name: string, slug: string }[]>([]);
+  const [categories, setCategories] = useState<{ name: string; slug: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeChip, setActiveChip] = useState<ChipKey>('SEMUA');
 
@@ -30,7 +31,14 @@ export default function AllCategoriesPage() {
       'bumbu': '🌶️',
       'mie': '🍜',
       'susu': '🥛',
-      'sabun': '🧼'
+      'sabun': '🧼',
+      'kopi': '☕',
+      'teh': '🍵',
+      'snack': '🍿',
+      'kebersihan': '🧹',
+      'beras': '🌾',
+      'minyak': '🫙',
+      'gula': '🍬',
     };
     // Cari yang mendekati atau default ke Box
     const found = Object.keys(icons).find(key => slug.includes(key));
@@ -40,31 +48,42 @@ export default function AllCategoriesPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const querySnapshot = await sbGetDocs({
-          table: 'products',
-          where: [{ field: 'isActive', op: '==', val: true }],
-          orderBy: [{ field: 'name', direction: 'asc' }],
-          useAdmin: false,
-        });
-        const allKategori = querySnapshot.docs
-          .map(doc => {
-            const data = doc.data();
-            // Filter client-side
-            const isActive = typeof data.isActive === 'boolean' ? data.isActive : (Number(data.Status ?? 1) !== 0);
-            if (!isActive) return null;
-            return data.Kategori || data.category || 'Lainnya';
-          })
-          .filter(Boolean) as string[];
+        const { data: rows, error } = await supabase
+          .from('products')
+          .select('category, raw_data, is_active')
+          .eq('is_active', true);
 
-        // Hilangkan duplikat
-        const uniqueCategories = Array.from(new Set(allKategori));
+        if (error || !rows) {
+          console.error("Gagal mengambil kategori:", error);
+          return;
+        }
 
-        // Format menjadi object
-        const formatted = uniqueCategories.map(cat => ({
-          name: cat,
-          slug: cat.toLowerCase().replace(/\s+/g, '-') // Buat slug otomatis
-        }));
+        const seen = new Map<string, { name: string; slug: string }>();
 
+        for (const doc of rows) {
+          const raw = (doc.raw_data as any) || {};
+          const isArchived =
+            raw.isActive === false ||
+            raw.isActive === 'false' ||
+            raw.status === 'ARCHIVED';
+          if (isArchived) continue;
+
+          const rawCat = (doc.category || raw.Kategori || raw.kategori || raw.category || '').trim();
+          if (!rawCat) continue;
+
+          const clean = cleanCategoryName(rawCat);
+          const normKey = clean.toLowerCase();
+          if (EXCLUDED_CATEGORY_NAMES.has(normKey)) continue;
+
+          if (!seen.has(normKey)) {
+            seen.set(normKey, {
+              name: clean,
+              slug: toCategorySlug(clean),
+            });
+          }
+        }
+
+        const formatted = Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name, 'id-ID'));
         setCategories(formatted);
       } catch (error) {
         console.error("Gagal mengambil kategori:", error);
@@ -133,7 +152,7 @@ export default function AllCategoriesPage() {
               .map((cat, index) => (
               <Link
                 key={index}
-                href={`/kategori/${cat.name}`} // Menggunakan nama asli agar cocok dengan query where('Kategori', '==', cat.name)
+                href={`/kategori/${cat.slug}`}
                 className="bg-white border border-gray-100 rounded-[2rem] p-6 text-center shadow-sm hover:shadow-xl hover:border-green-500/30 transition-all active:scale-95 group"
               >
                 <div className="w-20 h-20 bg-gray-50 group-hover:bg-green-600 group-hover:rotate-6 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 transition-all duration-500 shadow-inner">

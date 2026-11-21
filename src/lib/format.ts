@@ -90,3 +90,60 @@ export function formatProductName(name: string): string {
   return formattedWords.join(' ');
 }
 
+/**
+ * Normalisasi nama kategori menjadi Title Case standar,
+ * membersihkan kode angka (misal: "Kopi (700612)" -> "Kopi"),
+ * serta memperbaiki typo umum (misal: "Miuman" -> "Minuman").
+ */
+export function cleanCategoryName(name: string): string {
+  if (!name || typeof name !== 'string') return '';
+  let clean = name
+    .replace(/\s*\(\d+\)\s*$/, '') // hapus (angka) di akhir
+    .replace(/\s*\(\d{5,}\s*[-\w]*\)\s*$/, '') // hapus kode panjang
+    .trim();
+
+  // Tangani typo umum
+  if (clean.toLowerCase() === 'miuman') clean = 'Minuman';
+
+  const minorWords = new Set(['dan', 'atau', 'di', 'ke', 'dari', 'untuk', 'yang', 'pada', '&']);
+  return clean
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word, idx) => {
+      if (word === '&') return '&';
+      if (idx > 0 && minorWords.has(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+}
+
+/**
+ * Slug ramah URL dari nama kategori bersih (misal: "Bahan & Bumbu" -> "bahan-dan-bumbu")
+ */
+export function toCategorySlug(name: string): string {
+  const clean = cleanCategoryName(name);
+  return clean
+    .toLowerCase()
+    .replace(/&/g, 'dan')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'kategori';
+}
+
+/**
+ * Daftar kategori generik atau sistem yang tidak perlu dimunculkan di navigasi/katalog
+ */
+export const EXCLUDED_CATEGORY_NAMES = new Set([
+  'semua',
+  'semua kategori',
+  'umum',
+  'pokok',
+  'lainnya',
+  'other',
+  'others',
+  'produk',
+  'all',
+  'null',
+  'undefined',
+]);
+
+
