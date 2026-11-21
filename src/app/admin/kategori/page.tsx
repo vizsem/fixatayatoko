@@ -7,7 +7,7 @@ import useAdminAuth from '@/lib/hooks/useAdminAuth';
 import {
   Grid, Plus, Search, Edit, Trash2, Package, ChevronRight, X, Download,
   Layers, Save, Activity, RefreshCw, Zap, CheckCircle2, Sparkles,
-  AlertTriangle, Filter, ExternalLink, HelpCircle
+  AlertTriangle, Filter, ExternalLink, HelpCircle, ArrowUp, ArrowDown, Sliders
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import notify from '@/lib/notify';
@@ -348,6 +348,68 @@ export default function AdminCategories() {
     XLSX.writeFile(wb, "Kategori_Marketplace_Ataya.xlsx");
   };
 
+  const handleUpdateOrder = async (id: string, newOrder: number) => {
+    try {
+      const { data: existing } = await supabase.from('categories').select('raw_data').eq('id', id).single();
+      const raw = existing?.raw_data || {};
+      await supabase.from('categories').update({ raw_data: { ...raw, sort_order: newOrder } }).eq('id', id);
+      setCategories(prev => prev.map(c => c.id === id ? { ...c, sort_order: newOrder } : c));
+    } catch (err) {
+      console.error('Failed to update sort order:', err);
+    }
+  };
+
+  const handleShiftOrder = async (id: string, delta: number) => {
+    const target = categories.find(c => c.id === id);
+    if (!target) return;
+    const current = target.sort_order ?? 999;
+    const nextOrder = Math.max(1, current + delta);
+    await handleUpdateOrder(id, nextOrder);
+  };
+
+  const handleApplyRetailStandardOrder = async () => {
+    if (!confirm('Terapkan urutan standar ritel sembako untuk seluruh kategori? Kebutuhan pokok (beras, minyak, gula) akan otomatis diposisikan di urutan terdepan.')) return;
+    try {
+      notify.admin.info('Menyusun urutan standar ritel sembako...');
+      const orderRules = [
+        { regex: /beras|minyak|gula|sembako|tepung/i, rank: 1 },
+        { regex: /mie|pasta|bihun/i, rank: 2 },
+        { regex: /kopi|susu|teh|minuman|drink/i, rank: 3 },
+        { regex: /snack|camilan|keripik|biskuit|kue|roti|cokelat|permen/i, rank: 4 },
+        { regex: /bumbu|saus|kecap|garam|sambal/i, rank: 5 },
+        { regex: /kebersihan|deterjen|sabun|pembersih|cuci/i, rank: 6 },
+        { regex: /perawatan|gigi|kulit|kosmetik|popok|shampo/i, rank: 7 },
+        { regex: /rokok/i, rank: 8 },
+      ];
+
+      const updates: { id: string; sort_order: number }[] = [];
+      const updatedCategories = categories.map(cat => {
+        const name = cat.name.toLowerCase();
+        let rank = 99;
+        for (const rule of orderRules) {
+          if (rule.regex.test(name)) {
+            rank = rule.rank;
+            break;
+          }
+        }
+        updates.push({ id: cat.id, sort_order: rank });
+        return { ...cat, sort_order: rank };
+      });
+
+      for (const u of updates) {
+        const { data: existing } = await supabase.from('categories').select('raw_data').eq('id', u.id).single();
+        const raw = existing?.raw_data || {};
+        await supabase.from('categories').update({ raw_data: { ...raw, sort_order: u.sort_order } }).eq('id', u.id);
+      }
+
+      setCategories(updatedCategories.sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999) || a.name.localeCompare(b.name)));
+      notify.admin.success('Urutan standar sembako berhasil diterapkan!');
+    } catch (err) {
+      console.error('Error applying standard order:', err);
+      notify.admin.error('Gagal menerapkan urutan standar.');
+    }
+  };
+
   // Filter Categories
   const filtered = useMemo(() => {
     return categories.filter(c => {
@@ -429,6 +491,15 @@ export default function AdminCategories() {
             >
               <Zap size={16} className="fill-slate-950" />
               OTOMATISASI PENEMPATAN
+            </button>
+
+            {/* 1-Click Standard Retail Sorting */}
+            <button
+              onClick={handleApplyRetailStandardOrder}
+              className="px-4 py-3.5 bg-emerald-600/90 hover:bg-emerald-600 border border-emerald-400/40 rounded-2xl text-xs font-black tracking-wider text-white flex items-center gap-2 shadow-lg active:scale-95 transition-all"
+              title="Susun urutan kategori otomatis sesuai standar ritel sembako (Sembako terdepan)"
+            >
+              <Sliders size={16} /> URUTAN STANDAR SEMBAKO
             </button>
 
             {/* Export Excel */}
@@ -706,22 +777,34 @@ export default function AdminCategories() {
                     <span>{cat.show_on_homepage ? '🏠 Beranda' : '🔒 Tersembunyi'}</span>
                   </button>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <span className="text-[10px] text-slate-400 font-bold">Urutan:</span>
-                  <input
-                    type="number"
-                    min={1}
-                    value={cat.sort_order ?? 999}
-                    onChange={async (e) => {
-                      const newOrder = Number(e.target.value);
-                      const { data: existing } = await (await import('@/lib/supabase')).supabase.from('categories').select('raw_data').eq('id', cat.id).single();
-                      const raw = existing?.raw_data || {};
-                      await (await import('@/lib/supabase')).supabase.from('categories').update({ raw_data: { ...raw, sort_order: newOrder } }).eq('id', cat.id);
-                      setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, sort_order: newOrder } : c));
-                    }}
-                    className="w-16 text-center text-xs font-black border border-slate-200 rounded-lg px-1.5 py-0.5 bg-white focus:outline-none focus:border-indigo-400"
-                    title="Urutan tampil di beranda (angka kecil = tampil lebih awal)"
-                  />
+                  <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white">
+                    <button
+                      type="button"
+                      onClick={() => handleShiftOrder(cat.id, -1)}
+                      className="p-1 hover:bg-slate-100 text-slate-600 transition-colors"
+                      title="Geser Tampil Lebih Depan (Urutan -1)"
+                    >
+                      <ArrowUp size={12} />
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      value={cat.sort_order ?? 999}
+                      onChange={(e) => handleUpdateOrder(cat.id, Number(e.target.value))}
+                      className="w-12 text-center text-xs font-black px-1 py-0.5 bg-transparent focus:outline-none"
+                      title="Ketik angka urutan langsung"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleShiftOrder(cat.id, 1)}
+                      className="p-1 hover:bg-slate-100 text-slate-600 transition-colors"
+                      title="Geser Tampil Lebih Belakang (Urutan +1)"
+                    >
+                      <ArrowDown size={12} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

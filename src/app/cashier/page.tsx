@@ -263,6 +263,18 @@ export default function CashierPOS() {
   const [selectedCategory, setSelectedCategory] = useState<string>('SEMUA');
   const [stockFilter, setStockFilter] = useState<'all' | 'instock' | 'outstock'>('all');
 
+  // Counter jumlah produk aktif per kategori untuk tombol kasir
+  const productCountPerCategory = useMemo(() => {
+    const map = new Map<string, number>();
+    products.forEach(p => {
+      const c = String(p.Kategori || p.kategori || '').trim().toUpperCase();
+      if (c) {
+        map.set(c, (map.get(c) || 0) + 1);
+      }
+    });
+    return map;
+  }, [products]);
+
   // Offline queue
   const [offlineQueueCount, setOfflineQueueCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -2656,19 +2668,27 @@ Tetap lanjutkan menyimpan harga ini?`
               <div className="space-y-2">
                 {/* Category pills */}
                 <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                  {['SEMUA', ...categories].map(cat => (
-                    <button
-                      key={cat}
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wide transition-all border whitespace-nowrap ${
-                        selectedCategory === cat
-                          ? 'bg-green-600 text-white border-green-600 shadow-md shadow-green-200'
-                          : 'bg-white text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-600'
-                      }`}
-                    >
-                      {cat === 'SEMUA' ? 'SEMUA KATEGORI' : cat.toUpperCase()}
-                    </button>
-                  ))}
+                  {['SEMUA', ...categories].map(cat => {
+                    const count = cat === 'SEMUA' ? products.length : (productCountPerCategory.get(cat) || 0);
+                    return (
+                      <button
+                        key={cat}
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-black uppercase tracking-wide transition-all border whitespace-nowrap flex items-center gap-1.5 ${
+                          selectedCategory === cat
+                            ? 'bg-green-600 text-white border-green-600 shadow-md shadow-green-200'
+                            : 'bg-white text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-600'
+                        }`}
+                      >
+                        <span>{cat === 'SEMUA' ? 'SEMUA KATEGORI' : cat.toUpperCase()}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                          selectedCategory === cat ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Stock filter + Sort selector + count */}

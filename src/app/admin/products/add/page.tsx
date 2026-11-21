@@ -21,6 +21,7 @@ import { sbGetDoc } from '@/lib/supabase-helpers';
 import { getWarehouses } from '@/lib/actions/inventory.actions';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, type TaxSettings } from '@/lib/tax';
 import { calculateCustomerTierPrices } from '@/lib/customer-pricing';
+import { cleanCategoryName, EXCLUDED_CATEGORY_NAMES } from '@/lib/format';
 
 function UnitModalCalculator({
   contains,
@@ -614,7 +615,18 @@ export default function AddProductPage() {
     }).catch(console.error);
 
     getCategories().then((cats) => {
-      setCategories(cats.map((c) => ({ id: c.id, name: c.name })));
+      const seen = new Set<string>();
+      const cleanList: { id: string; name: string }[] = [];
+      cats.forEach((c: any) => {
+        const clean = cleanCategoryName(c.name);
+        const norm = clean.toLowerCase();
+        if (norm && !EXCLUDED_CATEGORY_NAMES.has(norm) && !seen.has(norm)) {
+          seen.add(norm);
+          cleanList.push({ id: c.id, name: clean });
+        }
+      });
+      cleanList.sort((a, b) => a.name.localeCompare(b.name, 'id-ID'));
+      setCategories(cleanList);
     }).catch(console.error);
   }, []);
   return (

@@ -85,6 +85,7 @@ export default async function HomePage() {
         image: p.imageUrl || '/logo-atayatoko.png',
         units: p.units || [],
         isPreOrder: Boolean(p.isPreOrder || p.raw_data?.isPreOrder),
+        isFeatured: Boolean(p.isFeatured || p.raw_data?.isFeatured),
         poLeadTimeDays: Number(p.poLeadTimeDays || p.raw_data?.poLeadTimeDays || 3),
         poNotes: p.poNotes || p.raw_data?.poNotes || '',
         raw_data: p.raw_data,

@@ -87,8 +87,12 @@ export default function HomeClient({
   };
   const theme = themeConfig[eventTheme] || themeConfig.default;
 
-  const randomProducts = useMemo(() => {
-    return [...products].filter((p) => p.stock > 0).slice(0, 6);
+  // Produk Pilihan / Unggulan Beranda: Prioritaskan produk ber-flag isFeatured, lalu produk dengan stok siap jual
+  const featuredProducts = useMemo(() => {
+    const featured = products.filter((p) => (p as any).isFeatured || (p as any).raw_data?.isFeatured);
+    if (featured.length >= 6) return featured.slice(0, 10);
+    const nonFeatured = products.filter((p) => !((p as any).isFeatured || (p as any).raw_data?.isFeatured) && p.stock > 0);
+    return [...featured, ...nonFeatured].slice(0, 10);
   }, [products]);
 
   // Kategori aktif yang memiliki produk di inventaris (dijamin 100% unik tanpa duplikasi)
@@ -446,11 +450,11 @@ export default function HomeClient({
             {/* Featured Products */}
             <div className="mb-8 px-4">
               <div className="flex items-center gap-2 mb-4">
-                <Sparkles size={18} className="text-yellow-500" />
-                <h2 className="text-sm font-black text-gray-800 tracking-tighter">Khusus Untukmu</h2>
+                <Sparkles size={18} className="text-yellow-500 fill-yellow-400" />
+                <h2 className="text-sm font-black text-gray-800 tracking-tighter">⭐ Produk Pilihan Toko</h2>
               </div>
               <div className="flex overflow-x-auto gap-4 scrollbar-hide pb-2 snap-x">
-                {randomProducts.map((p, idx) => (
+                {featuredProducts.map((p, idx) => (
                   <ProductCard
                     key={`rand-${p.id}`}
                     product={p}

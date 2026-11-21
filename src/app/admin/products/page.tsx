@@ -1921,6 +1921,36 @@ export default function AdminProducts() {
                         }`}>
                           {p.isActive === false ? 'Arsip' : 'Aktif'}
                         </span>
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const currentFeatured = Boolean((p as any).isFeatured || (p as any).raw_data?.isFeatured);
+                            const nextFeatured = !currentFeatured;
+                            try {
+                              const { data: existing } = await supabase.from('products').select('raw_data').eq('id', p.id).single();
+                              const raw = existing?.raw_data || {};
+                              await supabase.from('products').update({ raw_data: { ...raw, isFeatured: nextFeatured } }).eq('id', p.id);
+                              (p as any).isFeatured = nextFeatured;
+                              setLocalOverrides(prev => ({
+                                ...prev,
+                                [p.id]: { ...(prev[p.id] || {}), isFeatured: nextFeatured } as any
+                              }));
+                              notify.admin.success(nextFeatured ? 'Produk dipin ke Unggulan Beranda ⭐' : 'Produk dilepas dari Unggulan');
+                            } catch {
+                              notify.admin.error('Gagal mengubah status unggulan');
+                            }
+                          }}
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-all inline-flex items-center gap-0.5 ${
+                            (p as any).isFeatured || (p as any).raw_data?.isFeatured
+                              ? 'bg-amber-100 text-amber-800 border border-amber-300 font-black'
+                              : 'bg-gray-100 text-gray-400 hover:text-amber-600'
+                          }`}
+                          title="Tampilkan di Unggulan Beranda"
+                        >
+                          <span>⭐</span>
+                          <span>{(p as any).isFeatured || (p as any).raw_data?.isFeatured ? 'Unggulan' : 'Pin'}</span>
+                        </button>
                         {p.parentId ? (
                           <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 inline-flex items-center gap-1" title={`Induk: ${parentById.get(p.parentId)?.name || p.parentId}`}>
                             <span>↳ Varian</span>
@@ -2455,6 +2485,36 @@ export default function AdminProducts() {
                               }`}>
                                 {p.isActive === false ? 'Arsip' : 'Aktif'}
                               </span>
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const currentFeatured = Boolean((p as any).isFeatured || (p as any).raw_data?.isFeatured);
+                                  const nextFeatured = !currentFeatured;
+                                  try {
+                                    const { data: existing } = await supabase.from('products').select('raw_data').eq('id', p.id).single();
+                                    const raw = existing?.raw_data || {};
+                                    await supabase.from('products').update({ raw_data: { ...raw, isFeatured: nextFeatured } }).eq('id', p.id);
+                                    (p as any).isFeatured = nextFeatured;
+                                    setLocalOverrides(prev => ({
+                                      ...prev,
+                                      [p.id]: { ...(prev[p.id] || {}), isFeatured: nextFeatured } as any
+                                    }));
+                                    notify.admin.success(nextFeatured ? 'Produk dipin ke Unggulan Beranda ⭐' : 'Produk dilepas dari Unggulan Beranda');
+                                  } catch {
+                                    notify.admin.error('Gagal mengubah status unggulan');
+                                  }
+                                }}
+                                className={`text-[10px] font-bold px-1.5 py-0.2 rounded transition-all inline-flex items-center gap-0.5 ${
+                                  (p as any).isFeatured || (p as any).raw_data?.isFeatured
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300 font-black'
+                                    : 'bg-gray-100 text-gray-400 hover:text-amber-600 hover:bg-amber-50'
+                                }`}
+                                title="Klik untuk tampilkan di Unggulan Beranda"
+                              >
+                                <span>⭐</span>
+                                <span>{(p as any).isFeatured || (p as any).raw_data?.isFeatured ? 'Unggulan' : 'Pin'}</span>
+                              </button>
                               {p.parentId ? (
                                 <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-violet-100 text-violet-700 inline-flex items-center gap-1" title={`Induk: ${parentById.get(p.parentId)?.name || p.parentId}`}>
                                   <span>↳ Varian</span>

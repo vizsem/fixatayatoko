@@ -24,6 +24,7 @@ import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { isOperationalUser } from '@/lib/auth-helpers';
 import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbInsertDoc, sbUpsertDoc } from '@/lib/supabase-helpers';
 import { calculateTaxBreakdown, DEFAULT_TAX_SETTINGS, isCategoryTaxExempt, type TaxSettings } from '@/lib/tax';
+import { cleanCategoryName, EXCLUDED_CATEGORY_NAMES } from '@/lib/format';
 
 function UnitModalCalculator({
   contains,
@@ -630,7 +631,19 @@ export default function EditProductPage() {
 
   const fetchCategories = useCallback(async () => {
     const snapshot = await sbGetDocs({ table: 'categories' });
-    setCategories(snapshot.docs.map(d => ({ id: d.id, name: d.data().name })));
+    const seen = new Set<string>();
+    const cleanList: { id: string; name: string }[] = [];
+    snapshot.docs.forEach((d: any) => {
+      const rawName = d.data()?.name || '';
+      const clean = cleanCategoryName(rawName);
+      const norm = clean.toLowerCase();
+      if (norm && !EXCLUDED_CATEGORY_NAMES.has(norm) && !seen.has(norm)) {
+        seen.add(norm);
+        cleanList.push({ id: d.id, name: clean });
+      }
+    });
+    cleanList.sort((a, b) => a.name.localeCompare(b.name, 'id-ID'));
+    setCategories(cleanList);
   }, []);
 
   const [childVariants, setChildVariants] = useState<{ id: string; name: string; barcode?: string; stock: number }[]>([]);
