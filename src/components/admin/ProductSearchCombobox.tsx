@@ -30,6 +30,17 @@ interface ProductSearchComboboxProps {
   className?: string;
 }
 
+/**
+ * Mengambil 3 kata terakhir untuk varian anak (misal: "STRAWBERRY TPK 115ML")
+ * Jika kata <= 3, kembalikan nama utuh.
+ */
+function getVariantShortName(fullName: string): string {
+  if (!fullName) return '';
+  const words = fullName.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 3) return fullName;
+  return words.slice(-3).join(' ');
+}
+
 export default function ProductSearchCombobox({
   value,
   onChange,
@@ -369,6 +380,7 @@ export default function ProductSearchCombobox({
                       <div className="bg-slate-50/50 border-l-2 border-violet-300 ml-4 my-1 space-y-0.5">
                         {children.map((child) => {
                           const isChildSelected = child.id === value;
+                          const shortName = getVariantShortName(child.name);
                           return (
                             <div
                               key={child.id}
@@ -391,7 +403,7 @@ export default function ProductSearchCombobox({
                                         title={child.name}
                                         className="font-bold text-xs text-gray-900 leading-snug break-words"
                                       >
-                                        {child.name}
+                                        {shortName}
                                       </span>
                                       {child.sku && (
                                         <span className="font-mono text-[9px] text-gray-400 shrink-0">

@@ -136,6 +136,12 @@ type CashierShift = {
   notes?: string;
 };
 
+function getVariantShortName(fullName: string): string {
+  if (!fullName) return '';
+  const words = fullName.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 3) return fullName;
+  return words.slice(-3).join(' ');
+}
 
 export default function CashierPOS() {
   const router = useRouter();
@@ -4564,8 +4570,8 @@ Tetap lanjutkan menyimpan harga ini?`
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <CornerDownRight size={13} className="text-violet-500 shrink-0" />
-                          <span className="text-xs font-black text-gray-900">
-                            {v.name}
+                          <span title={v.name} className="text-xs font-black text-gray-900 leading-snug break-words">
+                            {getVariantShortName(v.name)}
                           </span>
                           {v.sku && (
                             <span className="text-[10px] font-mono text-gray-400">
