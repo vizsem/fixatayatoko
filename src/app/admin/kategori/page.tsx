@@ -21,7 +21,7 @@ import {
   autoClassifyProductsAction
 } from '@/lib/actions/product.actions';
 import { MARKETPLACE_CATEGORIES } from '@/lib/marketplace-categories';
-import { formatProductName } from '@/lib/format';
+import { formatProductName, cleanCategoryName } from '@/lib/format';
 
 type Category = {
   id: string;
@@ -87,7 +87,7 @@ export default function AdminCategories() {
       setLoading(true);
       const catSnap = await sbGetDocs({ table: 'categories' });
 
-      // Hitung jumlah produk per kategori secara efisien dalam 1 query batch
+      // Hitung jumlah produk AKTIF per kategori secara efisien
       const countMap: Record<string, number> = {};
       try {
         let from = 0;
@@ -95,13 +95,26 @@ export default function AdminCategories() {
         while (true) {
           const { data: prods, error: pErr } = await supabase
             .from('products')
-            .select('category')
+            .select('category, raw_data, is_active')
+            .eq('is_active', true)
             .range(from, from + pageSize - 1);
           if (pErr || !prods || prods.length === 0) break;
           for (const p of prods) {
-            if (p.category) {
-              const k = p.category.trim().toLowerCase();
-              countMap[k] = (countMap[k] || 0) + 1;
+            const raw = p.raw_data || {};
+            const isArchived =
+              raw.isActive === false ||
+              raw.isActive === 'false' ||
+              raw.status === 'ARCHIVED';
+            if (isArchived) continue;
+
+            const c = (p.category || raw.Kategori || raw.kategori || raw.category || '').trim();
+            if (c) {
+              const exactKey = c.toLowerCase();
+              const cleanKey = cleanCategoryName(c).toLowerCase();
+              countMap[exactKey] = (countMap[exactKey] || 0) + 1;
+              if (cleanKey !== exactKey) {
+                countMap[cleanKey] = (countMap[cleanKey] || 0) + 1;
+              }
             }
           }
           if (prods.length < pageSize) break;
@@ -115,7 +128,7 @@ export default function AdminCategories() {
         const data = doc.data();
         const raw = data.raw_data || {};
         const catName = data.name || raw.name || 'Untitled';
-        const exactCount = countMap[catName.toLowerCase()] || 0;
+        const exactCount = countMap[catName.toLowerCase()] || countMap[cleanCategoryName(catName).toLowerCase()] || 0;
 
         // Cek kecocokan di master marketplace jika belum ada di raw_data
         const mpMatch = MARKETPLACE_CATEGORIES.find(
@@ -346,6 +359,8 @@ export default function AdminCategories() {
       if (!matchSearch) return false;
 
       if (selectedGroup === 'all') return true;
+      if (selectedGroup === 'active_pos') return c.productCount > 0;
+      if (selectedGroup === 'inactive_pos') return c.productCount === 0;
       if (selectedGroup === 'marketplace') return c.isMarketplace;
       if (selectedGroup === 'makanan') return c.group === 'makanan' || c.name.toLowerCase().includes('makan') || c.name.toLowerCase().includes('snack') || c.name.toLowerCase().includes('kue') || c.name.toLowerCase().includes('kopi') || c.name.toLowerCase().includes('teh');
       if (selectedGroup === 'sembako') return c.group === 'sembako' || c.name.toLowerCase().includes('beras') || c.name.toLowerCase().includes('minyak') || c.name.toLowerCase().includes('gula') || c.name.toLowerCase().includes('bumbu');
@@ -356,6 +371,14 @@ export default function AdminCategories() {
   }, [categories, searchTerm, selectedGroup]);
 
   // Overall Stats
+  const activePosCatsCount = useMemo(() => {
+    return categories.filter(c => c.productCount > 0).length;
+  }, [categories]);
+
+  const inactivePosCatsCount = useMemo(() => {
+    return categories.filter(c => c.productCount === 0).length;
+  }, [categories]);
+
   const totalProductsClassified = useMemo(() => {
     return categories.reduce((acc, c) => acc + c.productCount, 0);
   }, [categories]);
@@ -450,16 +473,16 @@ export default function AdminCategories() {
             <p className="text-2xl font-black text-white mt-0.5">{categories.length}</p>
           </div>
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Marketplace Official</span>
-            <p className="text-2xl font-black text-amber-400 mt-0.5">{marketplaceCatsCount} <span className="text-xs font-semibold text-slate-400">kategori</span></p>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Aktif di POS & Beranda</span>
+            <p className="text-2xl font-black text-emerald-400 mt-0.5">{activePosCatsCount} <span className="text-xs font-semibold text-slate-400">kategori</span></p>
           </div>
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Total Terkategori</span>
-            <p className="text-2xl font-black text-emerald-400 mt-0.5">{totalProductsClassified.toLocaleString('id-ID')} <span className="text-xs font-semibold text-slate-400">SKU</span></p>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Belum Aktif (0 Produk)</span>
+            <p className="text-2xl font-black text-slate-300 mt-0.5">{inactivePosCatsCount} <span className="text-xs font-semibold text-slate-400">kategori</span></p>
           </div>
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Komisi Bakpia & Roti</span>
-            <p className="text-2xl font-black text-orange-400 mt-0.5">Shopee 9% · TikTok 9.5%</p>
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Total Produk Aktif</span>
+            <p className="text-2xl font-black text-amber-400 mt-0.5">{totalProductsClassified.toLocaleString('id-ID')} <span className="text-xs font-semibold text-slate-400">SKU</span></p>
           </div>
         </div>
 
@@ -473,7 +496,9 @@ export default function AdminCategories() {
         {/* Category Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
           {[
-            { id: 'all', label: 'Semua', count: categories.length },
+            { id: 'all', label: 'Semua Kategori', count: categories.length },
+            { id: 'active_pos', label: '🟢 Aktif di POS & Beranda', count: activePosCatsCount },
+            { id: 'inactive_pos', label: '⚪ Belum Aktif (0 Produk)', count: inactivePosCatsCount },
             { id: 'marketplace', label: 'Official Marketplace', count: marketplaceCatsCount },
             { id: 'makanan', label: '🍪 Snack & Makanan' },
             { id: 'sembako', label: '🛒 Sembako & Dapur' },
@@ -589,6 +614,21 @@ export default function AdminCategories() {
                       <Trash2 size={16} />
                     </button>
                   </div>
+                </div>
+
+                {/* Status Tampil POS & Beranda */}
+                <div className="mb-3">
+                  {cat.productCount > 0 ? (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                      AKTIF DI POS & BERANDA ({cat.productCount} Produk)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
+                      <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+                      BELUM AKTIF (0 Produk)
+                    </span>
+                  )}
                 </div>
 
                 {/* Description */}
