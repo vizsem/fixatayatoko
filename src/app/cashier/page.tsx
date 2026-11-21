@@ -8,7 +8,7 @@ import {
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
   History, X, Trash2, LayoutGrid, List, AlignJustify, Edit, ShoppingBag, Camera, User,
   Settings, Zap, ScanLine, PauseCircle, PlayCircle, RotateCcw, Layers, CornerDownRight,
-  MessageCircle, Monitor, Undo2, AlertTriangle, FileText
+  MessageCircle, Monitor, Undo2, AlertTriangle, FileText, Percent
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
@@ -170,6 +170,9 @@ export default function CashierPOS() {
   const [productSort, setProductSort] = useState<'recent_sold' | 'recent_update' | 'name'>('recent_sold');
   const [recentlySoldMap, setRecentlySoldMap] = useState<Map<string, number>>(new Map());
   const [customerPriceTier, setCustomerPriceTier] = useState<'Retail' | 'Semi-Grosir' | 'Grosir'>('Retail');
+  const [autoMinQtyPricing, setAutoMinQtyPricing] = useState<boolean>(() => {
+    try { return localStorage.getItem('pos-auto-minqty-pricing') !== 'false'; } catch { return true; }
+  });
 
   // Pengaturan Ukuran Kertas & Struk Kasir
   const [printSettings, setPrintSettings] = useState<{
@@ -514,7 +517,7 @@ export default function CashierPOS() {
         }
         const nextQty = exist.quantity + 1;
         let newPrice = exist.price;
-        if (product.priceTiers && product.priceTiers.length > 0) {
+        if (autoMinQtyPricing && product.priceTiers && product.priceTiers.length > 0) {
           const sortedTiers = [...product.priceTiers]
             .filter(t => t.minQty > 1 && t.price > 0)
             .sort((a, b) => b.minQty - a.minQty);
@@ -526,13 +529,15 @@ export default function CashierPOS() {
           }
         } else if (product.units && product.units.length > 0) {
           // Cek minQty pricing untuk PCS (units dengan code sama & minQty > 0)
-          const minQtyPricingUnits = product.units
-            .filter(u => u.code === baseCode && Number(u.minQty || 0) > 0 && Number(u.price || 0) > 0)
-            .sort((a, b) => Number(b.minQty) - Number(a.minQty));
+          const minQtyPricingUnits = autoMinQtyPricing
+            ? product.units
+                .filter(u => u.code === baseCode && Number(u.minQty || 0) > 0 && Number(u.price || 0) > 0)
+                .sort((a, b) => Number(b.minQty) - Number(a.minQty))
+            : [];
           const reachedMinQtyUnit = minQtyPricingUnits.find(u => nextQty >= Number(u.minQty));
           if (reachedMinQtyUnit) {
             newPrice = Number(reachedMinQtyUnit.price);
-          } else {
+          } else if (autoMinQtyPricing) {
             const higherUnits = product.units
               .filter(u => u.code !== baseCode && Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
               .sort((a, b) => Number(b.contains) - Number(a.contains));
@@ -542,6 +547,8 @@ export default function CashierPOS() {
             } else {
               newPrice = product.price;
             }
+          } else {
+            newPrice = product.price;
           }
         }
         return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: nextQty, price: newPrice } : i);
@@ -560,7 +567,7 @@ export default function CashierPOS() {
         appliedTier: tierResult.appliedTier,
       }];
     });
-  }, [transactionType, getChannelKey, addToCartWithUnit, selectedCustomer, variantsByParentId]);
+  }, [transactionType, getChannelKey, addToCartWithUnit, selectedCustomer, variantsByParentId, autoMinQtyPricing]);
 
   const handleScan = useCallback(async (code: string) => {
     try {
@@ -734,7 +741,7 @@ export default function CashierPOS() {
         } else if (effectiveCustomerType === 'Grosir' && product.priceGrosir && product.priceGrosir > 0) {
           effectivePrice = product.priceGrosir;
           appliedTier = 'Grosir';
-        } else if (product.priceTiers && product.priceTiers.length > 0) {
+        } else if (autoMinQtyPricing && product.priceTiers && product.priceTiers.length > 0) {
           const sortedTiers = [...product.priceTiers]
             .filter(t => t.minQty > 1 && t.price > 0)
             .sort((a, b) => b.minQty - a.minQty);
@@ -753,21 +760,23 @@ export default function CashierPOS() {
               appliedTier = 'Retail';
             }
           }
-        } else if (product.priceSemiGrosir && product.priceSemiGrosir > 0 && q >= (product.minGrosir || 3)) {
+        } else if (autoMinQtyPricing && product.priceSemiGrosir && product.priceSemiGrosir > 0 && q >= (product.minGrosir || 3)) {
           // Otomatis terapkan harga Semi-Grosir (Warung) jika qty >= minGrosir (default 3)
           effectivePrice = product.priceSemiGrosir;
           appliedTier = 'Semi-Grosir';
         } else if (product.units && product.units.length > 0) {
           // Cek minQty pricing untuk PCS (units dengan code sama & minQty > 0)
           const baseCode = product.unit || 'PCS';
-          const minQtyPricingUnits = product.units
-            .filter(u => u.code === baseCode && Number(u.minQty || 0) > 0 && Number(u.price || 0) > 0)
-            .sort((a, b) => Number(b.minQty) - Number(a.minQty));
+          const minQtyPricingUnits = autoMinQtyPricing
+            ? product.units
+                .filter(u => u.code === baseCode && Number(u.minQty || 0) > 0 && Number(u.price || 0) > 0)
+                .sort((a, b) => Number(b.minQty) - Number(a.minQty))
+            : [];
           const reachedMinQtyUnit = minQtyPricingUnits.find(u => q >= Number(u.minQty));
           if (reachedMinQtyUnit) {
             effectivePrice = Number(reachedMinQtyUnit.price);
             appliedTier = reachedMinQtyUnit.label || 'Grosir';
-          } else {
+          } else if (autoMinQtyPricing) {
             const higherUnits = product.units
               .filter(u => u.code !== baseCode && Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
               .sort((a, b) => Number(b.contains) - Number(a.contains));
@@ -787,6 +796,16 @@ export default function CashierPOS() {
               effectivePrice = tierResult.effectivePrice;
               appliedTier = tierResult.appliedTier;
             }
+          } else {
+            const tierResult = resolveCustomerUnitPrice({
+              baseEcer: product.price,
+              priceSemiGrosir: product.priceSemiGrosir,
+              priceGrosir: product.priceGrosir,
+              customerType: effectiveCustomerType,
+              contains: 1,
+            });
+            effectivePrice = tierResult.effectivePrice;
+            appliedTier = tierResult.appliedTier;
           }
         } else {
           const tierResult = resolveCustomerUnitPrice({
@@ -803,7 +822,7 @@ export default function CashierPOS() {
 
       return prev.map(i => i.id === id ? { ...i, quantity: q, price: effectivePrice, appliedTier } : i);
     });
-  }, [products, selectedCustomer, customerPriceTier]);
+  }, [products, selectedCustomer, customerPriceTier, autoMinQtyPricing]);
 
   const updatePrice = useCallback((id: string, newTotal: number, quantity: number) => {
     const item = cart.find(i => i.id === id);
@@ -3178,11 +3197,12 @@ Tetap lanjutkan menyimpan harga ini?`
                       setCart(prev => prev.map(item => {
                         const prod = products.find(p => p.id === item.id);
                         if (!prod) return item;
-                        const mult = Number(item.contains || 1);
+                        const isBase = (item.contains || 1) <= 1;
+                        if (!isBase) return item;
                         return {
                           ...item,
-                          price: prod.price * mult,
-                          originalPrice: prod.price * mult,
+                          price: prod.price,
+                          originalPrice: prod.price,
                           appliedTier: 'Retail',
                         };
                       }));
@@ -3203,18 +3223,19 @@ Tetap lanjutkan menyimpan harga ini?`
                       setCart(prev => prev.map(item => {
                         const prod = products.find(p => p.id === item.id);
                         if (!prod) return item;
-                        const mult = Number(item.contains || 1);
+                        const isBase = (item.contains || 1) <= 1;
+                        if (!isBase) return item;
                         const tierResult = resolveCustomerUnitPrice({
                           baseEcer: prod.price,
                           priceSemiGrosir: prod.priceSemiGrosir,
                           priceGrosir: prod.priceGrosir,
                           customerType: 'Semi-Grosir',
-                          contains: mult,
+                          contains: 1,
                         });
                         return {
                           ...item,
                           price: tierResult.effectivePrice,
-                          originalPrice: prod.price * mult,
+                          originalPrice: prod.price,
                           appliedTier: 'Semi-Grosir',
                         };
                       }));
@@ -3235,18 +3256,19 @@ Tetap lanjutkan menyimpan harga ini?`
                       setCart(prev => prev.map(item => {
                         const prod = products.find(p => p.id === item.id);
                         if (!prod) return item;
-                        const mult = Number(item.contains || 1);
+                        const isBase = (item.contains || 1) <= 1;
+                        if (!isBase) return item;
                         const tierResult = resolveCustomerUnitPrice({
                           baseEcer: prod.price,
                           priceSemiGrosir: prod.priceSemiGrosir,
                           priceGrosir: prod.priceGrosir,
                           customerType: 'Grosir',
-                          contains: mult,
+                          contains: 1,
                         });
                         return {
                           ...item,
                           price: tierResult.effectivePrice,
-                          originalPrice: prod.price * mult,
+                          originalPrice: prod.price,
                           appliedTier: 'Grosir',
                         };
                       }));
@@ -4171,6 +4193,70 @@ Tetap lanjutkan menyimpan harga ini?`
                 <p className="text-[11px] text-gray-400 mt-2 text-center">
                   {selectedWarehouse === 'auto' ? '⚡ Stok diambil otomatis sesuai prioritas waterfall' : `🏢 Stok selalu diambil dari gudang terpilih`}
                 </p>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-100" />
+
+              {/* ── Diskon MinQty Grosir Otomatis ── */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                    autoMinQtyPricing ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'
+                  }`}>
+                    <Percent size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-bold text-gray-800">Harga MinQty Otomatis</p>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                        autoMinQtyPricing ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
+                      }`}>
+                        {autoMinQtyPricing ? 'ON' : 'OFF'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      {autoMinQtyPricing 
+                        ? 'Diskon grosir otomatis saat qty PCS mencapai minimal'
+                        : 'Nonaktif: selalu gunakan harga eceran normal'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAutoMinQtyPricing(v => {
+                      const next = !v;
+                      try { localStorage.setItem('pos-auto-minqty-pricing', String(next)); } catch {}
+                      if (!next) {
+                        setCart(prev => prev.map(item => {
+                          const prod = products.find(p => p.id === item.id);
+                          if (!prod) return item;
+                          const isBase = (item.contains || 1) <= 1;
+                          if (!isBase) return item;
+                          const effectiveCustomerType = selectedCustomer?.customerType || customerPriceTier;
+                          const tierResult = resolveCustomerUnitPrice({
+                            baseEcer: prod.price,
+                            priceSemiGrosir: prod.priceSemiGrosir,
+                            priceGrosir: prod.priceGrosir,
+                            customerType: effectiveCustomerType,
+                            contains: 1,
+                          });
+                          return {
+                            ...item,
+                            price: tierResult.effectivePrice,
+                            appliedTier: tierResult.appliedTier,
+                          };
+                        }));
+                      }
+                      toast.success(next ? 'Harga MinQty Otomatis: AKTIF' : 'Harga MinQty Otomatis: NONAKTIF');
+                      return next;
+                    });
+                  }}
+                  className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${autoMinQtyPricing ? 'bg-emerald-500' : 'bg-gray-200'}`}
+                >
+                  <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${autoMinQtyPricing ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                </button>
               </div>
 
               {/* Divider */}
