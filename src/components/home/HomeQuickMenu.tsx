@@ -122,7 +122,9 @@ export default function HomeQuickMenu({ activeCategories, brands }: HomeQuickMen
         }
       }
     }
-    return Array.from(seen.values()).slice(0, 16);
+    return Array.from(seen.values())
+      .sort((a, b) => (a.sort_order ?? 999) - (b.sort_order ?? 999) || a.cleanName.localeCompare(b.cleanName, 'id-ID'))
+      .slice(0, 16);
   }, [activeCategories]);
 
   const filteredBrands = brands.filter((b) =>

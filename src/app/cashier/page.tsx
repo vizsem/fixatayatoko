@@ -1425,7 +1425,31 @@ Tetap lanjutkan menyimpan harga ini?`
               .map(prod => String(prod.Kategori || prod.kategori || '').trim().toUpperCase())
               .filter(cat => cat && cat !== 'SEMUA' && cat !== 'SEMUA KATEGORI' && cat !== 'NULL' && cat !== 'UNDEFINED')
           )
-        ).sort((a, b) => a.localeCompare(b, 'id-ID'));
+        );
+
+        // Ambil sort_order dari master categories agar posisi tombol kategori di POS selaras dengan admin
+        try {
+          const { data: catOrderRows } = await supabase
+            .from('categories')
+            .select('name, raw_data');
+          const catOrderMap = new Map<string, number>();
+          (catOrderRows || []).forEach((c: any) => {
+            const raw = c.raw_data || {};
+            const name = String(c.name || raw.name || '').trim().toUpperCase();
+            if (name && raw.sort_order !== undefined) {
+              catOrderMap.set(name, Number(raw.sort_order));
+            }
+          });
+
+          activeProductCats.sort((a, b) => {
+            const oA = catOrderMap.get(a) ?? 999;
+            const oB = catOrderMap.get(b) ?? 999;
+            if (oA !== oB) return oA - oB;
+            return a.localeCompare(b, 'id-ID');
+          });
+        } catch {
+          activeProductCats.sort((a, b) => a.localeCompare(b, 'id-ID'));
+        }
 
         setCategories(activeProductCats);
         setSelectedCategory(prev => (prev === 'SEMUA' || activeProductCats.includes(prev) ? prev : 'SEMUA'));
