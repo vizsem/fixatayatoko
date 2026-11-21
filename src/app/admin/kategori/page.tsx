@@ -221,16 +221,52 @@ export default function AdminCategories() {
 
     try {
       if (editId) {
+        const oldCategory = categories.find(c => c.id === editId);
+        const oldName = oldCategory?.name?.trim();
+        const newName = formData.name.trim();
+
         await sbUpdateDoc('categories', editId, {
-          name: formData.name,
+          name: newName,
           slug,
           raw_data: {
             ...formData,
+            name: newName,
             slug,
             updatedAt: new Date().toISOString()
           },
           updatedAt: new Date().toISOString()
         });
+
+        // Cascade update: Perbarui seluruh produk yang menggunakan nama kategori lama agar POS & Beranda langsung selaras
+        if (oldName && oldName.toLowerCase() !== newName.toLowerCase()) {
+          try {
+            const { data: affectedProducts } = await supabase
+              .from('products')
+              .select('id, category, raw_data')
+              .or(`category.eq.${oldName},category.ilike.${oldName}`);
+
+            if (affectedProducts && affectedProducts.length > 0) {
+              for (const prod of affectedProducts) {
+                const updatedRaw = {
+                  ...(prod.raw_data || {}),
+                  Kategori: newName,
+                  kategori: newName,
+                  category: newName,
+                };
+                await supabase
+                  .from('products')
+                  .update({
+                    category: newName,
+                    raw_data: updatedRaw,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', prod.id);
+              }
+            }
+          } catch (cascadeErr) {
+            console.error('Error cascading category rename to products:', cascadeErr);
+          }
+        }
       } else {
         await sbInsertDoc('categories', {
           name: formData.name,
