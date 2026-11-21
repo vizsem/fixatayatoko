@@ -36,6 +36,7 @@ type UnitOption = {
   contains?: number;
   price?: number;
   minQty?: number;
+  label?: string;
 };
 
 type ChannelKey = 'offline' | 'website' | 'shopee' | 'tiktok';
@@ -394,20 +395,32 @@ export default function CashierPOS() {
       unitPrice = (product.channelPricing as ChannelPricing)['website']![code].price!;
     }
 
-    // Apply customer tier pricing (Semi-Grosir / Warung / Grosir / Retail)
+    // Apply customer tier pricing HANYA untuk satuan dasar (PCS).
+    // Satuan di atas (CTN, RTG, dll) gunakan harga tetap dari unit itu sendiri —
+    // TIDAK dikalikan priceSemiGrosir/priceGrosir (itu per-PCS, bukan per-CTN).
     const customerType = selectedCustomer?.customerType || customerPriceTier;
-    const tierResult = resolveCustomerUnitPrice({
-      baseEcer: product.price,
-      priceSemiGrosir: product.priceSemiGrosir,
-      priceGrosir: product.priceGrosir,
-      customerType,
-      contains,
-      unitPriceOverride: unitPrice,
-    });
-    const effectiveUnitPrice = tierResult.effectivePrice;
+    let effectiveUnitPrice: number;
+    let appliedTierFinal: 'Retail' | 'Semi-Grosir' | 'Grosir' = 'Retail';
 
-    const unitCost = product.cost * contains;
-    const unitOriginalPrice = product.price * contains;
+    if (isBaseUnit) {
+      const tierResult = resolveCustomerUnitPrice({
+        baseEcer: product.price,
+        priceSemiGrosir: product.priceSemiGrosir,
+        priceGrosir: product.priceGrosir,
+        customerType,
+        contains: 1,
+        unitPriceOverride: unitPrice,
+      });
+      effectiveUnitPrice = tierResult.effectivePrice;
+      appliedTierFinal = tierResult.appliedTier;
+    } else {
+      // CTN / RTG / dll: gunakan harga tetap unit itu sendiri
+      effectiveUnitPrice = unitPrice;
+      appliedTierFinal = 'Retail';
+    }
+
+    const unitCost = product.cost * Math.max(contains, 1);
+    const unitOriginalPrice = product.price * Math.max(contains, 1);
 
     setCart(prev => {
       const exist = prev.find(i => i.id === product.id && i.unit === code);
@@ -434,7 +447,7 @@ export default function CashierPOS() {
         unit: code, 
         contains, 
         channel,
-        appliedTier: tierResult.appliedTier,
+        appliedTier: appliedTierFinal,
       }];
     });
   }, [transactionType, getChannelKey, selectedCustomer, variantsByParentId]);
@@ -512,12 +525,23 @@ export default function CashierPOS() {
             newPrice = product.price;
           }
         } else if (product.units && product.units.length > 0) {
-          const higherUnits = product.units
-            .filter(u => u.code !== (product.unit || 'PCS') && Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
-            .sort((a, b) => Number(b.contains) - Number(a.contains));
-          const reachedHigher = higherUnits.find(u => nextQty >= Number(u.contains));
-          if (reachedHigher) {
-            newPrice = Number(reachedHigher.price) / Number(reachedHigher.contains);
+          // Cek minQty pricing untuk PCS (units dengan code sama & minQty > 0)
+          const minQtyPricingUnits = product.units
+            .filter(u => u.code === baseCode && Number(u.minQty || 0) > 0 && Number(u.price || 0) > 0)
+            .sort((a, b) => Number(b.minQty) - Number(a.minQty));
+          const reachedMinQtyUnit = minQtyPricingUnits.find(u => nextQty >= Number(u.minQty));
+          if (reachedMinQtyUnit) {
+            newPrice = Number(reachedMinQtyUnit.price);
+          } else {
+            const higherUnits = product.units
+              .filter(u => u.code !== baseCode && Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
+              .sort((a, b) => Number(b.contains) - Number(a.contains));
+            const reachedHigher = higherUnits.find(u => nextQty >= Number(u.contains));
+            if (reachedHigher) {
+              newPrice = Number(reachedHigher.price) / Number(reachedHigher.contains);
+            } else {
+              newPrice = product.price;
+            }
           }
         }
         return prev.map(i => i.id === product.id && i.unit === baseCode ? { ...i, quantity: nextQty, price: newPrice } : i);
@@ -734,24 +758,35 @@ export default function CashierPOS() {
           effectivePrice = product.priceSemiGrosir;
           appliedTier = 'Semi-Grosir';
         } else if (product.units && product.units.length > 0) {
-          const higherUnits = product.units
-            .filter(u => u.code !== (product.unit || 'PCS') && Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
-            .sort((a, b) => Number(b.contains) - Number(a.contains));
-          
-          const reachedHigher = higherUnits.find(u => q >= Number(u.contains));
-          if (reachedHigher) {
-            effectivePrice = Number(reachedHigher.price) / Number(reachedHigher.contains);
-            appliedTier = 'Grosir';
+          // Cek minQty pricing untuk PCS (units dengan code sama & minQty > 0)
+          const baseCode = product.unit || 'PCS';
+          const minQtyPricingUnits = product.units
+            .filter(u => u.code === baseCode && Number(u.minQty || 0) > 0 && Number(u.price || 0) > 0)
+            .sort((a, b) => Number(b.minQty) - Number(a.minQty));
+          const reachedMinQtyUnit = minQtyPricingUnits.find(u => q >= Number(u.minQty));
+          if (reachedMinQtyUnit) {
+            effectivePrice = Number(reachedMinQtyUnit.price);
+            appliedTier = reachedMinQtyUnit.label || 'Grosir';
           } else {
-            const tierResult = resolveCustomerUnitPrice({
-              baseEcer: product.price,
-              priceSemiGrosir: product.priceSemiGrosir,
-              priceGrosir: product.priceGrosir,
-              customerType: effectiveCustomerType,
-              contains: 1,
-            });
-            effectivePrice = tierResult.effectivePrice;
-            appliedTier = tierResult.appliedTier;
+            const higherUnits = product.units
+              .filter(u => u.code !== baseCode && Number(u.contains || 0) > 1 && Number(u.price || 0) > 0)
+              .sort((a, b) => Number(b.contains) - Number(a.contains));
+            
+            const reachedHigher = higherUnits.find(u => q >= Number(u.contains));
+            if (reachedHigher) {
+              effectivePrice = Number(reachedHigher.price) / Number(reachedHigher.contains);
+              appliedTier = 'Grosir';
+            } else {
+              const tierResult = resolveCustomerUnitPrice({
+                baseEcer: product.price,
+                priceSemiGrosir: product.priceSemiGrosir,
+                priceGrosir: product.priceGrosir,
+                customerType: effectiveCustomerType,
+                contains: 1,
+              });
+              effectivePrice = tierResult.effectivePrice;
+              appliedTier = tierResult.appliedTier;
+            }
           }
         } else {
           const tierResult = resolveCustomerUnitPrice({
@@ -1356,7 +1391,8 @@ Tetap lanjutkan menyimpan harga ini?`
               const price = typeof ru.price === 'number' ? ru.price : Number(ru.price || 0);
               const rawMin = ru.minQty;
               const minQty = typeof rawMin === 'number' ? rawMin : (rawMin !== undefined ? Number(rawMin) : undefined);
-              return { code, contains, price, minQty, barcode: ru.barcode ? String(ru.barcode) : undefined } as UnitOption;
+              const label = ru.label ? String(ru.label) : undefined;
+              return { code, contains, price, minQty, label, barcode: ru.barcode ? String(ru.barcode) : undefined } as UnitOption;
             })
             .filter((u): u is UnitOption => !!u && typeof u.code === 'string' && u.code.length > 0);
           if (!units.find(u => u.code === baseUnit)) units.unshift({ code: baseUnit, contains: 1, price: basePrice });
