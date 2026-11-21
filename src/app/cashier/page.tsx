@@ -8,7 +8,7 @@ import {
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
   History, X, Trash2, LayoutGrid, List, AlignJustify, Edit, ShoppingBag, Camera, User,
   Settings, Zap, ScanLine, PauseCircle, PlayCircle, RotateCcw, Layers, CornerDownRight,
-  MessageCircle, Monitor, Undo2, AlertTriangle, FileText, Percent, UserPlus, UserCheck, Store, Phone
+  MessageCircle, Monitor, Undo2, AlertTriangle, FileText, Percent, UserPlus, UserCheck, Store, Phone, Tag
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
 import toast from 'react-hot-toast';
@@ -172,6 +172,9 @@ export default function CashierPOS() {
   const [customerPriceTier, setCustomerPriceTier] = useState<'Retail' | 'Semi-Grosir' | 'Grosir'>('Retail');
   const [autoMinQtyPricing, setAutoMinQtyPricing] = useState<boolean>(() => {
     try { return localStorage.getItem('pos-auto-minqty-pricing') !== 'false'; } catch { return true; }
+  });
+  const [showStrikePrice, setShowStrikePrice] = useState<boolean>(() => {
+    try { return localStorage.getItem('pos-show-strike-price') !== 'false'; } catch { return true; }
   });
 
   // Pengaturan Ukuran Kertas & Struk Kasir
@@ -433,7 +436,10 @@ export default function CashierPOS() {
     }
 
     const unitCost = product.cost * Math.max(contains, 1);
-    const unitOriginalPrice = product.price * Math.max(contains, 1);
+    // Untuk satuan dasar (PCS), originalPrice adalah harga ecer normal.
+    // Untuk satuan non-dasar (CTN/BOX/RTG), harga asli (originalPrice) adalah harga satuan itu sendiri
+    // BUKAN harga ecer dikali isi, agar tidak memunculkan harga coret & diskon hemat palsu.
+    const unitOriginalPrice = isBaseUnit ? (product.price * Math.max(contains, 1)) : effectiveUnitPrice;
 
     setCart(prev => {
       const exist = prev.find(i => i.id === product.id && i.unit === code);
@@ -998,12 +1004,13 @@ Tetap lanjutkan menyimpan harga ini?`
   }, [cart, subtotal, paymentMethod, isProcessing, selectedCustomer, customerName, qrisReferenceNo]);
 
   const cartSavings = useMemo(() => {
+    if (!showStrikePrice) return 0;
     return cart.reduce((sum, item) => {
       const origPrice = Number(item.originalPrice || item.price || 0);
       const currPrice = Number(item.price || 0);
       return sum + (origPrice > currPrice ? (origPrice - currPrice) * item.quantity : 0);
     }, 0);
-  }, [cart]);
+  }, [cart, showStrikePrice]);
 
   const shippingCost = useMemo(() => {
     const rates: Record<string, number> = { 'Ambil di Toko': 0, 'Kurir Toko': 15000, 'OJOL': 0 };
@@ -2558,13 +2565,18 @@ Tetap lanjutkan menyimpan harga ini?`
     const enrichedItems = (order.items || []).map((item: any) => {
       let orig = Number(item.originalPrice || 0);
       const cur = Number(item.price || 0);
-      if (orig <= cur) {
+      const isBase = !item.contains || Number(item.contains) <= 1;
+      // Hanya satuan dasar (PCS) yang fallback ke master ecer, bukan RTG / CTN
+      if (isBase && orig <= cur) {
         const prod = productsById.get(item.id);
         if (prod) {
-          const mult = item.contains && Number(item.contains) > 0 ? Number(item.contains) : 1;
-          const masterEcer = Number(prod.price || 0) * mult;
+          const masterEcer = Number(prod.price || 0);
           if (masterEcer > cur) orig = masterEcer;
         }
+      }
+      // Jika kasir menonaktifkan harga coret & hemat via pengaturan, jangan munculkan selisih
+      if (!showStrikePrice) {
+        orig = cur;
       }
       return {
         ...item,
@@ -3623,7 +3635,7 @@ Tetap lanjutkan menyimpan harga ini?`
                               item.appliedTier === 'Grosir' ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'
                             }`}>{item.appliedTier}</span>
                           )}
-                          {item.originalPrice > item.price && (
+                          {showStrikePrice && item.originalPrice > item.price && (
                             <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
                               Hemat Rp{((item.originalPrice - item.price) * item.quantity).toLocaleString('id-ID')}
                             </span>
@@ -3663,7 +3675,7 @@ Tetap lanjutkan menyimpan harga ini?`
                         >
                           <Edit size={10} className="text-gray-300 group-hover:text-green-600" />
                           <div>
-                            {item.originalPrice > item.price && (
+                            {showStrikePrice && item.originalPrice > item.price && (
                               <p className="text-[10px] line-through text-gray-400">
                                 Rp{(item.originalPrice * item.quantity).toLocaleString()}
                               </p>
@@ -3755,8 +3767,11 @@ Tetap lanjutkan menyimpan harga ini?`
 
                             const minQty = Number(u.minQty || 0);
                             const unitCost = (prod?.cost || 0) * Math.max(contains, 1);
-                            // originalPrice = harga ecer × isi (referensi harga penuh tanpa diskon)
-                            const unitOriginalPrice = (prod?.price || 0) * Math.max(contains, 1);
+                            // Untuk satuan dasar (PCS), originalPrice adalah harga ecer normal.
+                            // Untuk satuan non-dasar (RTG, CTN, dll), originalPrice adalah harga asli unit tersebut
+                            // BUKAN harga ecer dikali isi, agar tidak memunculkan harga coret & diskon hemat palsu.
+                            const isBase = code === baseUnit;
+                            const unitOriginalPrice = isBase ? ((prod?.price || 0) * Math.max(contains, 1)) : unitPrice;
 
                             setCart(prev => prev.map(ci => {
                               if (ci.id !== item.id) return ci;
@@ -4899,6 +4914,49 @@ Tetap lanjutkan menyimpan harga ini?`
                   className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${autoMinQtyPricing ? 'bg-emerald-500' : 'bg-gray-200'}`}
                 >
                   <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${autoMinQtyPricing ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-100" />
+
+              {/* ── Tanda Harga Coret & Hemat ── */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                    showStrikePrice ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'
+                  }`}>
+                    <Tag size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-bold text-gray-800">Tanda Harga Coret & Hemat</p>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                        showStrikePrice ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
+                      }`}>
+                        {showStrikePrice ? 'ON' : 'OFF'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      {showStrikePrice 
+                        ? 'Tampilkan harga coret dan badge hemat diskon di kasir & nota'
+                        : 'Sembunyikan tanda coret & info hemat (hanya harga bersih)'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowStrikePrice(v => {
+                      const next = !v;
+                      try { localStorage.setItem('pos-show-strike-price', String(next)); } catch {}
+                      toast.success(next ? 'Harga Coret & Hemat: AKTIF (ON)' : 'Harga Coret & Hemat: NONAKTIF (OFF)');
+                      return next;
+                    });
+                  }}
+                  className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${showStrikePrice ? 'bg-emerald-500' : 'bg-gray-200'}`}
+                >
+                  <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${showStrikePrice ? 'translate-x-6' : 'translate-x-0.5'}`} />
                 </button>
               </div>
 
