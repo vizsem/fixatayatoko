@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   Package, ShoppingCart, Search, Plus, Minus, Printer, Bell,
   MessageSquare, Truck, CheckCircle, Upload, Barcode,
-  History, X, Trash2, LayoutGrid, List, Edit, ShoppingBag, Camera, User,
+  History, X, Trash2, LayoutGrid, List, AlignJustify, Edit, ShoppingBag, Camera, User,
   Settings, Zap, ScanLine, PauseCircle, PlayCircle, RotateCcw, Layers, CornerDownRight
 } from 'lucide-react';
 import imageCompression from 'browser-image-compression'; // TAMBAHAN: Library Kompresi
@@ -65,6 +65,7 @@ type Product = {
   priceSemiGrosir?: number;
   priceGrosir?: number;
   priceTiers?: Array<{ minQty: number; price: number; label?: string }>;
+  updatedAt?: string;
   channelPricing?: ChannelPricing | {
     offline?: { price?: number };
     website?: { price?: number };
@@ -139,10 +140,23 @@ export default function CashierPOS() {
   const [loading, setLoading] = useState(true);
   const [isFetchingProducts, setIsFetchingProducts] = useState(false);
   const [activeTab, setActiveTab] = useState<'pos' | 'orders'>('pos');
-  // Default list view on mobile (grid on desktop)
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>(
-    typeof window !== 'undefined' && window.innerWidth < 768 ? 'list' : 'grid'
-  );
+  // View mode: grid, list, dense (tanpa gambar, muat banyak)
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'dense'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('pos-view-mode') as 'grid' | 'list' | 'dense' | null;
+      if (saved && ['grid', 'list', 'dense'].includes(saved)) return saved;
+      return window.innerWidth < 768 ? 'list' : 'grid';
+    }
+    return 'grid';
+  });
+  const handleSetViewMode = (mode: 'grid' | 'list' | 'dense') => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('pos-view-mode', mode);
+    } catch {}
+  };
+  const [productSort, setProductSort] = useState<'recent_sold' | 'recent_update' | 'name'>('recent_sold');
+  const [recentlySoldMap, setRecentlySoldMap] = useState<Map<string, number>>(new Map());
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [displayLimit, setDisplayLimit] = useState(80);
@@ -1053,8 +1067,8 @@ export default function CashierPOS() {
           promises.push(
             supabase
               .from('products')
-              .select('id, name, price, stock, raw_data, unit, cost_price, barcode, image_url, is_active, sku')
-              .order('name', { ascending: true })
+              .select('id, name, price, stock, raw_data, unit, cost_price, barcode, image_url, is_active, sku, updated_at')
+              .order('updated_at', { ascending: false })
               .range(from, to)
               .then(res => res.data || [])
           );
@@ -1119,8 +1133,6 @@ export default function CashierPOS() {
               return url.trim().startsWith('http') ? url.trim() : '';
             })(),
             units,
-            Kategori: raw.Kategori || raw.kategori || raw.category || 'UMUM',
-            kategori: raw.Kategori || raw.kategori || raw.category || 'UMUM',
             stockByWarehouse: raw.stockByWarehouse || {},
             channelPricing: raw.channelPricing,
             priceSemiGrosir: Number(raw.priceSemiGrosir || 0) || undefined,
@@ -1128,8 +1140,42 @@ export default function CashierPOS() {
             priceTiers: Array.isArray(raw.priceTiers) ? raw.priceTiers : undefined,
             parentId: (raw.Parent_ID || raw.parentId || raw.parent_id || '').toString().trim() || undefined,
             isParentOnly: Boolean(raw.isParentOnly || raw.is_parent_only),
+            updatedAt: d.updated_at || raw.updated_at || raw.updatedAt || '',
+            Kategori: String(raw.Kategori || raw.kategori || raw.category || 'UMUM').toUpperCase(),
+            kategori: String(raw.Kategori || raw.kategori || raw.category || 'UMUM').toUpperCase(),
           });
         }
+
+        // Fetch recent sold data for "baru laku" sort
+        const soldMap = new Map<string, number>();
+        try {
+          const { data: recentOrdersData } = await supabase
+            .from('orders')
+            .select('items, created_at')
+            .order('created_at', { ascending: false })
+            .limit(100);
+
+          let rank = 0;
+          (recentOrdersData || []).forEach((o: any) => {
+            const items = Array.isArray(o.items) ? o.items : [];
+            items.forEach((item: any) => {
+              if (item.id && !soldMap.has(item.id)) {
+                soldMap.set(item.id, rank++);
+              }
+            });
+          });
+          setRecentlySoldMap(soldMap);
+        } catch (soldErr) {
+          console.warn('Could not fetch recent orders for sold ranking:', soldErr);
+        }
+
+        // Sort default: Baru Laku -> Baru Update
+        p.sort((a, b) => {
+          const aRec = soldMap.get(a.id) ?? 999999;
+          const bRec = soldMap.get(b.id) ?? 999999;
+          if (aRec !== bRec) return aRec - bRec;
+          return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+        });
 
         setProducts(p);
         setFilteredProducts(p);
@@ -1147,9 +1193,9 @@ export default function CashierPOS() {
           .from('categories')
           .select('name')
           .order('name', { ascending: true });
-        const masterCats = (catRows || []).map((c: any) => String(c.name)).filter(Boolean);
+        const masterCats = (catRows || []).map((c: any) => String(c.name).trim().toUpperCase()).filter(Boolean);
         // Augment with any category found in active products that may not be in master table
-        const productCats = Array.from(new Set(p.map(prod => prod.Kategori || prod.kategori || ''))).filter(Boolean) as string[];
+        const productCats = Array.from(new Set(p.map(prod => String(prod.Kategori || prod.kategori || '').trim().toUpperCase()))).filter(Boolean) as string[];
         const allCats = Array.from(new Set([...masterCats, ...productCats])).sort();
         setCategories(allCats);
         try {
@@ -1300,7 +1346,8 @@ export default function CashierPOS() {
     const tokens = term ? term.split(/\s+/).filter(Boolean) : [];
 
     let filtered = products.filter(p => {
-      const matchCategory = selectedCategory === 'SEMUA' || (p.Kategori || p.kategori || 'UMUM') === selectedCategory;
+      const prodCat = String(p.Kategori || p.kategori || 'UMUM').toUpperCase();
+      const matchCategory = selectedCategory === 'SEMUA' || prodCat === selectedCategory.toUpperCase();
       const matchStock = stockFilter === 'all' ? true : (stockFilter === 'instock' ? (p.stock || 0) > 0 : (p.stock || 0) <= 0);
       if (!matchCategory || !matchStock) return false;
 
@@ -1343,6 +1390,19 @@ export default function CashierPOS() {
 
         return 0;
       });
+    } else {
+      filtered.sort((a, b) => {
+        if (productSort === 'recent_sold') {
+          const aRec = recentlySoldMap.get(a.id) ?? 999999;
+          const bRec = recentlySoldMap.get(b.id) ?? 999999;
+          if (aRec !== bRec) return aRec - bRec;
+          return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+        } else if (productSort === 'recent_update') {
+          return (b.updatedAt || '').localeCompare(a.updatedAt || '');
+        } else {
+          return (a.name || '').localeCompare(b.name || '');
+        }
+      });
     }
 
     setFilteredProducts(filtered);
@@ -1367,7 +1427,7 @@ export default function CashierPOS() {
       }
       setSearchQuery('');
     }
-  }, [searchQuery, products, addToCart, addToCartWithUnit, selectedCategory, stockFilter, productsById]);
+  }, [searchQuery, products, addToCart, addToCartWithUnit, selectedCategory, stockFilter, productsById, productSort, recentlySoldMap]);
 
   useEffect(() => {
     if (loading) return;
@@ -2259,9 +2319,10 @@ export default function CashierPOS() {
                   >
                     <Camera size={14} /> Scan
                   </button>
-                  <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
-                    <button onClick={() => setViewMode('grid')} className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><LayoutGrid size={16} className="md:w-[18px] md:h-[18px]" /></button>
-                    <button onClick={() => setViewMode('list')} className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-white shadow text-green-600' : 'text-gray-400'}`}><List size={16} className="md:w-[18px] md:h-[18px]" /></button>
+                  <div className="flex bg-gray-100 p-1 rounded-lg shrink-0 gap-0.5">
+                    <button onClick={() => handleSetViewMode('grid')} title="Tampilan Grid (Foto)" className={`p-1.5 rounded transition-all ${viewMode === 'grid' ? 'bg-white shadow text-green-600 font-bold' : 'text-gray-400 hover:text-gray-600'}`}><LayoutGrid size={16} className="md:w-[18px] md:h-[18px]" /></button>
+                    <button onClick={() => handleSetViewMode('list')} title="Tampilan List (Foto)" className={`p-1.5 rounded transition-all ${viewMode === 'list' ? 'bg-white shadow text-green-600 font-bold' : 'text-gray-400 hover:text-gray-600'}`}><List size={16} className="md:w-[18px] md:h-[18px]" /></button>
+                    <button onClick={() => handleSetViewMode('dense')} title="Tampilan Ringkas / Tanpa Foto (Muat Banyak)" className={`p-1.5 rounded transition-all ${viewMode === 'dense' ? 'bg-white shadow text-green-600 font-bold' : 'text-gray-400 hover:text-gray-600'}`}><AlignJustify size={16} className="md:w-[18px] md:h-[18px]" /></button>
                   </div>
                 </div>
               </div>
@@ -2280,13 +2341,13 @@ export default function CashierPOS() {
                           : 'bg-white text-gray-500 border-gray-200 hover:border-green-400 hover:text-green-600'
                       }`}
                     >
-                      {cat === 'SEMUA' ? 'Semua Kategori' : cat}
+                      {cat === 'SEMUA' ? 'SEMUA KATEGORI' : cat.toUpperCase()}
                     </button>
                   ))}
                 </div>
 
-                {/* Stock filter + count */}
-                <div className="flex items-center gap-2">
+                {/* Stock filter + Sort selector + count */}
+                <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex bg-gray-100 p-1 rounded-xl">
                     {(['all', 'instock', 'outstock'] as const).map(f => (
                       <button
@@ -2303,6 +2364,20 @@ export default function CashierPOS() {
                         {f === 'all' ? 'Semua' : f === 'instock' ? '✓ Ready' : '✗ Habis'}
                       </button>
                     ))}
+                  </div>
+
+                  {/* Urutan Produk: Baru Laku / Baru Update / A-Z */}
+                  <div className="flex items-center">
+                    <select
+                      value={productSort}
+                      onChange={e => setProductSort(e.target.value as any)}
+                      className="bg-white border border-gray-200 text-gray-700 text-xs font-bold rounded-xl px-2.5 py-1.5 shadow-2xs outline-none hover:border-green-400 focus:border-green-600 cursor-pointer"
+                      title="Urutkan Tampilan Produk"
+                    >
+                      <option value="recent_sold">🔥 Baru Laku</option>
+                      <option value="recent_update">⏱ Baru Update</option>
+                      <option value="name">🔤 Nama (A-Z)</option>
+                    </select>
                   </div>
 
                   {(selectedCategory !== 'SEMUA' || stockFilter !== 'all' || searchQuery) && (
@@ -2331,25 +2406,47 @@ export default function CashierPOS() {
 
             {/* Product Skeleton or Grid */}
             {isFetchingProducts && products.length === 0 ? (
-              <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-4 gap-3' : 'flex flex-col gap-2'}>
-                {Array.from({ length: viewMode === 'grid' ? 12 : 6 }).map((_, i) => (
-                  <div key={i} className={`bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse ${
-                    viewMode === 'grid' ? 'flex flex-col p-3' : 'flex flex-row items-center p-3 gap-4'
-                  }`}>
-                    <div className={`bg-gray-100 rounded-xl ${
-                      viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14 shrink-0'
-                    }`} />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-3 bg-gray-100 rounded-full w-3/4" />
-                      <div className="h-4 bg-green-50 rounded-full w-1/2" />
-                      <div className="h-2 bg-gray-100 rounded-full w-1/3" />
+              <div className={
+                viewMode === 'dense'
+                  ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5'
+                  : viewMode === 'grid'
+                  ? 'grid grid-cols-2 md:grid-cols-4 gap-3'
+                  : 'flex flex-col gap-2'
+              }>
+                {Array.from({ length: viewMode === 'dense' ? 18 : viewMode === 'grid' ? 12 : 6 }).map((_, i) => (
+                  viewMode === 'dense' ? (
+                    <div key={i} className="bg-white rounded-xl border border-gray-100 p-2.5 animate-pulse flex items-center justify-between">
+                      <div className="space-y-1.5 flex-1">
+                        <div className="h-3 bg-gray-100 rounded w-2/3" />
+                        <div className="h-2 bg-gray-50 rounded w-1/3" />
+                      </div>
+                      <div className="h-4 bg-green-50 rounded w-16" />
                     </div>
-                  </div>
+                  ) : (
+                    <div key={i} className={`bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse ${
+                      viewMode === 'grid' ? 'flex flex-col p-3' : 'flex flex-row items-center p-3 gap-4'
+                    }`}>
+                      <div className={`bg-gray-100 rounded-xl ${
+                        viewMode === 'grid' ? 'w-full aspect-square mb-3' : 'w-14 h-14 shrink-0'
+                      }`} />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 bg-gray-100 rounded-full w-3/4" />
+                        <div className="h-4 bg-green-50 rounded-full w-1/2" />
+                        <div className="h-2 bg-gray-100 rounded-full w-1/3" />
+                      </div>
+                    </div>
+                  )
                 ))}
               </div>
             ) : (
               <div
-                className={viewMode === 'grid' ? "grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-1" : "flex flex-col gap-2 overflow-y-auto pr-1"}
+                className={
+                  viewMode === 'dense'
+                    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 overflow-y-auto pr-1"
+                    : viewMode === 'grid'
+                    ? "grid grid-cols-2 md:grid-cols-4 gap-3 overflow-y-auto pr-1"
+                    : "flex flex-col gap-2 overflow-y-auto pr-1"
+                }
                 style={{ maxHeight: 'calc(100vh - 240px)' }}
                 data-testid="product-grid-view"
               >
@@ -2357,6 +2454,80 @@ export default function CashierPOS() {
                 const childVariants = variantsByParentId.get(p.id) || [];
                 const isParentGroup = Boolean(p.isParentOnly || childVariants.length > 0);
                 const isVariant = Boolean(p.parentId);
+
+                if (viewMode === 'dense') {
+                  return (
+                    <div
+                      key={p.id}
+                      onClick={() => addToCart(p)}
+                      className={`bg-white border rounded-xl px-3 py-2 flex items-center justify-between gap-3 shadow-2xs hover:border-green-500 hover:shadow-sm cursor-pointer transition-all active:scale-[0.99] ${
+                        p.isParentOnly
+                          ? 'border-violet-200 bg-violet-50/20 hover:border-violet-500'
+                          : (p.stock || 0) <= 0
+                          ? 'border-red-200 bg-red-50/30'
+                          : 'border-gray-100 hover:bg-green-50/20'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {isVariant && (
+                            <span className="text-[9px] font-bold text-violet-700 bg-violet-50 border border-violet-100 px-1 rounded shrink-0">
+                              ↳
+                            </span>
+                          )}
+                          {isParentGroup && (
+                            <span className="text-[9px] font-black text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded flex items-center gap-0.5 shrink-0">
+                              <Layers size={9} /> {childVariants.length} Varian
+                            </span>
+                          )}
+                          <span className="text-xs font-bold text-gray-800 truncate block">
+                            {formatProductName(p.name)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-gray-400 font-medium">
+                          <span>{p.displayUnit || p.unit}</span>
+                          <span>•</span>
+                          <span className={(p.stock || 0) <= 0 ? 'text-red-500 font-bold' : (p.stock || 0) < 10 ? 'text-amber-600 font-bold' : 'text-gray-500'}>
+                            {(p.stock || 0) <= 0 ? 'Habis' : `Stok: ${p.stock}`}
+                          </span>
+                          {p.barcode && <span className="hidden sm:inline font-mono text-[9px] text-gray-300">[{p.barcode}]</span>}
+                          {p.priceTiers && p.priceTiers.length > 0 && (
+                            <span className="text-[9px] font-black text-purple-600 bg-purple-50 px-1 rounded">
+                              Grosir
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        {p.isParentOnly ? (
+                          <span className="text-[11px] font-bold text-violet-600 flex items-center gap-1">
+                            <Layers size={11} /> Pilih Varian
+                          </span>
+                        ) : (
+                          <div>
+                            <div className="text-xs sm:text-sm font-black text-green-700">
+                              Rp{(p.displayPrice || p.price).toLocaleString()}
+                            </div>
+                            {(p.units || []).filter(u => u.contains && Number(u.contains) > 1).length > 0 && (
+                              <div className="flex items-center justify-end gap-1 mt-0.5" onClick={e => e.stopPropagation()}>
+                                {(p.units || []).filter(u => u.contains && Number(u.contains) > 1).slice(0, 2).map(u => (
+                                  <button
+                                    key={u.code}
+                                    onClick={() => addToCartWithUnit(p, u)}
+                                    className="text-[9px] font-black text-blue-600 bg-blue-50 hover:bg-blue-100 px-1 py-0.5 rounded border border-blue-100 transition-colors"
+                                    title={`Tambah ${u.code}`}
+                                  >
+                                    +{u.code}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
                 <div 
@@ -2491,7 +2662,7 @@ export default function CashierPOS() {
             })}
 
               {filteredProducts.length === 0 && !isFetchingProducts && (
-                <div className={viewMode === 'grid' ? "col-span-2 md:col-span-4 py-20 text-center" : "py-20 text-center"}>
+                <div className={viewMode === 'dense' ? "col-span-1 sm:col-span-2 lg:col-span-3 py-20 text-center" : viewMode === 'grid' ? "col-span-2 md:col-span-4 py-20 text-center" : "py-20 text-center"}>
                   <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Package size={32} className="text-gray-300" />
                   </div>
@@ -2513,7 +2684,7 @@ export default function CashierPOS() {
               )}
 
               {filteredProducts.length > displayLimit && (
-                <div className={viewMode === 'grid' ? "col-span-2 md:col-span-4 py-4 text-center" : "py-4 text-center"}>
+                <div className={viewMode === 'dense' ? "col-span-1 sm:col-span-2 lg:col-span-3 py-4 text-center" : viewMode === 'grid' ? "col-span-2 md:col-span-4 py-4 text-center" : "py-4 text-center"}>
                   <button
                     onClick={() => setDisplayLimit(prev => prev + 80)}
                     className="px-6 py-2.5 bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 text-xs font-black uppercase tracking-wider rounded-2xl shadow-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-2 mx-auto"
