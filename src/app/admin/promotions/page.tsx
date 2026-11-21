@@ -42,6 +42,13 @@ type Promotion = {
   bundlePrice?: number;
   allowStacking?: boolean;
   allowLossLeader?: boolean;
+  // Khusus Min. Qty (Grosir):
+  minQty?: number;
+  customTierPrice?: number;
+  tierLabel?: string;
+  tierRules?: Array<{ minQty: number; price?: number; label?: string }>;
+  applyToProductTiers?: boolean;
+  minQtyPricingMode?: 'fixed' | 'nominal_cut' | 'percentage';
 };
 
 const idr = (n: number) => `Rp${Math.abs(n).toLocaleString('id-ID')}`;
@@ -108,7 +115,14 @@ export default function PromotionsPage() {
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Hapus promosi "${name}" secara permanen?`)) return;
     try {
+      const promo = promotions.find(p => p.id === id);
       await sbDeleteDoc('promotions', id);
+      // Jika promo bertipe min-qty dan memiliki targetId, bersihkan priceTiers di produk
+      if (promo && promo.type === 'min-qty' && promo.targetId) {
+        try {
+          await sbUpdateDoc('products', promo.targetId, { priceTiers: [] });
+        } catch {}
+      }
       notify.admin.success('Promosi berhasil dihapus.');
     } catch {
       notify.admin.error('Gagal menghapus promosi.');
@@ -117,11 +131,34 @@ export default function PromotionsPage() {
 
   const handleToggleActive = async (promo: Promotion) => {
     try {
+      const nextActive = !promo.isActive;
       await sbUpdateDoc('promotions', promo.id, {
-        isActive: !promo.isActive,
+        isActive: nextActive,
         updatedAt: new Date().toISOString(),
       });
-      notify.admin.success(`Promosi ${!promo.isActive ? 'diaktifkan' : 'dinonaktifkan'}`);
+      // Sinkronkan status aktif ke produk jika min-qty
+      if (promo.type === 'min-qty' && promo.targetId) {
+        try {
+          if (!nextActive) {
+            await sbUpdateDoc('products', promo.targetId, { priceTiers: [] });
+          } else {
+            const primaryTier = {
+              minQty: Number(promo.minQty || 3),
+              price: Number(promo.customTierPrice || promo.discountValue || 0),
+              label: promo.tierLabel || `Grosir min ${promo.minQty || 3}`,
+            };
+            const additional = (promo.tierRules || []).map(t => ({
+              minQty: Number(t.minQty),
+              price: Number(t.price || 0),
+              label: t.label || `Grosir min ${t.minQty}`,
+            }));
+            await sbUpdateDoc('products', promo.targetId, {
+              priceTiers: [primaryTier, ...additional].sort((a, b) => a.minQty - b.minQty),
+            });
+          }
+        } catch {}
+      }
+      notify.admin.success(`Promosi ${nextActive ? 'diaktifkan' : 'dinonaktifkan'}`);
     } catch {
       notify.admin.error('Gagal mengubah status promosi');
     }
@@ -187,6 +224,7 @@ export default function PromotionsPage() {
     { id: 'bundle', label: 'Bundling', icon: ShoppingBag },
     { id: 'buy-x-get-y', label: 'Beli X Gratis Y', icon: Sparkles },
     { id: 'min-purchase', label: 'Min. Belanja', icon: DollarSign },
+    { id: 'min-qty', label: 'Grosir Min. Qty', icon: Layers },
   ];
 
   return (
@@ -330,8 +368,10 @@ export default function PromotionsPage() {
                     <div>
                       <h4 className="text-sm font-black text-slate-900">{promo.name}</h4>
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className="px-2 py-0.5 rounded-lg text-xs font-black uppercase bg-slate-100 text-slate-600">
-                          {promo.type}
+                        <span className={`px-2 py-0.5 rounded-lg text-xs font-black uppercase ${
+                          promo.type === 'min-qty' ? 'bg-violet-100 text-violet-800 border border-violet-200' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {promo.type === 'min-qty' ? 'Grosir Min. Qty' : promo.type}
                         </span>
                         {promo.code && (
                           <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-black bg-purple-50 text-purple-700 border border-purple-200">
@@ -359,7 +399,11 @@ export default function PromotionsPage() {
                   {/* Guardrail Badges */}
                   <div className="flex flex-wrap gap-1.5 text-xs font-bold">
                     <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg">
-                      Potongan: {promo.discountType === 'percentage' ? `${promo.discountValue}%` : idr(promo.discountValue)}
+                      {promo.type === 'min-qty'
+                        ? `Beli Min. ${promo.minQty || 3} pcs → ${promo.customTierPrice ? idr(promo.customTierPrice) : (promo.discountType === 'percentage' ? `${promo.discountValue}%` : idr(promo.discountValue))}`
+                        : promo.type === 'buy-x-get-y'
+                        ? `Beli ${promo.buyQty || 2} Gratis ${promo.freeQty || 1}`
+                        : `Potongan: ${promo.discountType === 'percentage' ? `${promo.discountValue}%` : idr(promo.discountValue)}`}
                     </span>
                     {promo.minPurchase ? (
                       <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-lg">
@@ -448,8 +492,10 @@ export default function PromotionsPage() {
 
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-1.5">
-                          <span className="px-2 py-0.5 rounded-lg text-xs font-black uppercase bg-slate-100 text-slate-700">
-                            {promo.type}
+                          <span className={`px-2 py-0.5 rounded-lg text-xs font-black uppercase ${
+                            promo.type === 'min-qty' ? 'bg-violet-100 text-violet-800 border border-violet-200' : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {promo.type === 'min-qty' ? 'Grosir Min. Qty' : promo.type}
                           </span>
                         </div>
                         <p className="text-xs font-bold text-slate-500 mt-1 line-clamp-1">
@@ -458,17 +504,29 @@ export default function PromotionsPage() {
                       </td>
 
                       <td className="px-5 py-3.5">
-                        <span className="text-xs font-black text-emerald-600">
-                          {promo.type === 'buy-x-get-y'
-                            ? `Beli ${promo.buyQty || 2} Gratis ${promo.freeQty || 1}`
-                            : promo.discountType === 'percentage'
-                            ? `${promo.discountValue}%`
-                            : idr(promo.discountValue)}
+                        <span className={`text-xs font-black ${promo.type === 'min-qty' ? 'text-violet-700' : 'text-emerald-600'}`}>
+                          {promo.type === 'min-qty' ? (
+                            <span>
+                              Min. {promo.minQty || 3} pcs → {promo.customTierPrice ? idr(promo.customTierPrice) : (promo.discountType === 'percentage' ? `${promo.discountValue}%` : idr(promo.discountValue))}
+                            </span>
+                          ) : promo.type === 'buy-x-get-y' ? (
+                            `Beli ${promo.buyQty || 2} Gratis ${promo.freeQty || 1}`
+                          ) : promo.discountType === 'percentage' ? (
+                            `${promo.discountValue}%`
+                          ) : (
+                            idr(promo.discountValue)
+                          )}
                         </span>
                       </td>
 
                       <td className="px-5 py-3.5">
                         <div className="flex flex-col gap-1 text-xs">
+                          {promo.type === 'min-qty' && (
+                            <span className="text-violet-700 font-bold">
+                              ⚡ {promo.tierLabel || `Grosir min ${promo.minQty || 3}`}
+                              {promo.tierRules && promo.tierRules.length > 0 && ` (+${promo.tierRules.length} tier)`}
+                            </span>
+                          )}
                           {promo.minPurchase && promo.minPurchase > 0 ? (
                             <span className="text-blue-700 font-bold">🛡️ Min. Belanja {idr(promo.minPurchase)}</span>
                           ) : (

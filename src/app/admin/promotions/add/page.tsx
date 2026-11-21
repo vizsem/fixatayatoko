@@ -24,7 +24,15 @@ export type PromoType =
   | 'flash-sale'
   | 'bundle'
   | 'buy-x-get-y'
-  | 'min-purchase';
+  | 'min-purchase'
+  | 'min-qty';
+
+export type TierRule = {
+  minQty: number;
+  price?: number;
+  discountValue?: number;
+  label?: string;
+};
 
 export type PromotionData = {
   name: string;
@@ -50,6 +58,13 @@ export type PromotionData = {
   bundlePrice?: number;       // Harga khusus paket bundle
   allowStacking?: boolean;    // Boleh ditumpuk promo lain
   allowLossLeader?: boolean;  // Konfirmasi jika sengaja jual rugi
+  // Khusus Min. Qty (Grosir):
+  minQty?: number;            // Minimal kuantiti (pcs)
+  customTierPrice?: number;   // Harga khusus grosir per pcs (misal Rp8.600)
+  tierLabel?: string;         // Label grosir (misal "Grosir min 3")
+  tierRules?: TierRule[];     // Aturan tier bertingkat
+  applyToProductTiers?: boolean; // Sinkronkan ke data priceTiers produk
+  minQtyPricingMode?: 'fixed' | 'nominal_cut' | 'percentage';
 };
 
 type Product = {
@@ -87,6 +102,12 @@ const getInitialPromotion = (): PromotionData => {
     bundlePrice: 0,
     allowStacking: false,
     allowLossLeader: false,
+    minQty: 3,
+    customTierPrice: 0,
+    tierLabel: 'Grosir min 3',
+    tierRules: [],
+    applyToProductTiers: true,
+    minQtyPricingMode: 'fixed',
   };
 };
 
@@ -193,6 +214,12 @@ function AddPromotionContent() {
             bundlePrice: Number(d.bundlePrice || 0),
             allowStacking: Boolean(d.allowStacking),
             allowLossLeader: Boolean(d.allowLossLeader),
+            minQty: Number(d.minQty || 3),
+            customTierPrice: Number(d.customTierPrice || 0),
+            tierLabel: d.tierLabel || '',
+            tierRules: Array.isArray(d.tierRules) ? d.tierRules : [],
+            applyToProductTiers: d.applyToProductTiers !== undefined ? Boolean(d.applyToProductTiers) : true,
+            minQtyPricingMode: d.minQtyPricingMode || 'fixed',
           });
         }
       } catch (err) {
@@ -215,9 +242,9 @@ function AddPromotionContent() {
     }));
   };
 
-  // Selected product for single product/flash sale simulation
+  // Selected product for single product/flash sale/min-qty simulation
   const selectedProduct = useMemo(() => {
-    if (formData.targetId && (formData.type === 'product' || formData.type === 'flash-sale')) {
+    if (formData.targetId && (formData.type === 'product' || formData.type === 'flash-sale' || formData.type === 'min-qty')) {
       return products.find((p) => p.id === formData.targetId);
     }
     return null;
@@ -233,7 +260,18 @@ function AddPromotionContent() {
     let promoPrice = normalPrice;
     let potongDiskon = 0;
 
-    if (formData.discountType === 'percentage') {
+    if (formData.type === 'min-qty') {
+      if (formData.minQtyPricingMode === 'fixed' && formData.customTierPrice && formData.customTierPrice > 0) {
+        promoPrice = formData.customTierPrice;
+        potongDiskon = Math.max(0, normalPrice - promoPrice);
+      } else if (formData.discountType === 'percentage') {
+        potongDiskon = (normalPrice * formData.discountValue) / 100;
+        promoPrice = Math.max(0, normalPrice - potongDiskon);
+      } else {
+        potongDiskon = formData.discountValue;
+        promoPrice = Math.max(0, normalPrice - potongDiskon);
+      }
+    } else if (formData.discountType === 'percentage') {
       potongDiskon = (normalPrice * formData.discountValue) / 100;
       if (formData.maxDiscount && formData.maxDiscount > 0) {
         potongDiskon = Math.min(potongDiskon, formData.maxDiscount);
@@ -271,7 +309,25 @@ function AddPromotionContent() {
     }
 
     // Validation per type
-    if (formData.type !== 'bundle' && formData.type !== 'buy-x-get-y') {
+    if (formData.type === 'min-qty') {
+      if (!formData.targetId) {
+        setError('Silakan pilih produk target untuk program Grosir Min. Qty');
+        return;
+      }
+      if (!formData.minQty || formData.minQty < 2) {
+        setError('Minimal kuantiti (Min. Qty) harus minimal 2 pcs');
+        return;
+      }
+      if (formData.minQtyPricingMode === 'fixed') {
+        if (!formData.customTierPrice || formData.customTierPrice <= 0) {
+          setError('Harga khusus grosir per pcs harus lebih dari 0');
+          return;
+        }
+      } else if (formData.discountValue <= 0) {
+        setError('Nilai potongan diskon harus lebih dari 0');
+        return;
+      }
+    } else if (formData.type !== 'bundle' && formData.type !== 'buy-x-get-y') {
       if (formData.discountValue <= 0) {
         setError('Nilai diskon harus lebih dari 0');
         return;
@@ -336,6 +392,12 @@ function AddPromotionContent() {
         bundlePrice: Number(formData.bundlePrice || 0),
         allowStacking: Boolean(formData.allowStacking),
         allowLossLeader: Boolean(formData.allowLossLeader),
+        minQty: Number(formData.minQty || 3),
+        customTierPrice: Number(formData.customTierPrice || 0),
+        tierLabel: formData.tierLabel || `Grosir min ${formData.minQty || 3}`,
+        tierRules: formData.tierRules || [],
+        applyToProductTiers: Boolean(formData.applyToProductTiers),
+        minQtyPricingMode: formData.minQtyPricingMode || 'fixed',
         updatedAt: new Date().toISOString(),
       };
 
@@ -348,6 +410,35 @@ function AddPromotionContent() {
           createdAt: new Date().toISOString(),
         });
         notify.admin.success('Program promosi berhasil diterbitkan!');
+      }
+
+      // Sinkronkan ke data priceTiers produk jika promo bertipe min-qty
+      if (formData.type === 'min-qty' && formData.applyToProductTiers && formData.targetId) {
+        try {
+          const effectivePrice = formData.minQtyPricingMode === 'fixed' && formData.customTierPrice
+            ? formData.customTierPrice
+            : formData.discountType === 'percentage'
+            ? Math.round((selectedProduct?.price || 0) * (1 - formData.discountValue / 100))
+            : Math.max(0, (selectedProduct?.price || 0) - formData.discountValue);
+
+          const primaryTier = {
+            minQty: Number(formData.minQty || 3),
+            price: effectivePrice,
+            label: formData.tierLabel || `Grosir min ${formData.minQty || 3}`,
+          };
+
+          const additionalTiers = (formData.tierRules || [])
+            .filter(t => t.minQty > 1 && t.price && t.price > 0)
+            .map(t => ({ minQty: Number(t.minQty), price: Number(t.price), label: t.label || `Grosir min ${t.minQty}` }));
+
+          const combinedTiers = [primaryTier, ...additionalTiers].sort((a, b) => a.minQty - b.minQty);
+
+          await sbUpdateDoc('products', formData.targetId, {
+            priceTiers: combinedTiers,
+          });
+        } catch (syncErr) {
+          console.warn('Gagal sinkron priceTiers ke produk:', syncErr);
+        }
       }
 
       router.push('/admin/promotions');
@@ -380,6 +471,7 @@ function AddPromotionContent() {
     { id: 'bundle', label: 'Paket Bundling', desc: 'Beli paket beberapa produk lebih hemat', icon: ShoppingBag, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
     { id: 'buy-x-get-y', label: 'Beli X Gratis Y', desc: 'Beli 2 gratis 1 atau hadiah gratis', icon: Sparkles, color: 'text-amber-600 bg-amber-50 border-amber-200' },
     { id: 'min-purchase', label: 'Min. Belanja', desc: 'Diskon jika belanja mencapai target Rp', icon: DollarSign, color: 'text-cyan-600 bg-cyan-50 border-cyan-200' },
+    { id: 'min-qty', label: 'Grosir Min. Qty', desc: 'Diskon otomatis saat beli kuantiti tertentu (misal: Min. 3 pcs)', icon: Layers, color: 'text-violet-600 bg-violet-50 border-violet-200' },
   ];
 
   return (
@@ -468,7 +560,7 @@ function AddPromotionContent() {
             </div>
 
             {/* Target Selector */}
-            {(formData.type === 'product' || formData.type === 'flash-sale') && (
+            {(formData.type === 'product' || formData.type === 'flash-sale' || formData.type === 'min-qty') && (
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Pilih Produk Target *</label>
                 <select
@@ -555,7 +647,313 @@ function AddPromotionContent() {
         </div>
 
         {/* SECTION 3: SKEMA DISKON & SIMULATOR HPP */}
-        {formData.type !== 'buy-x-get-y' && (
+        {formData.type === 'min-qty' ? (
+          <div className="bg-white p-5 md:p-7 rounded-3xl border border-slate-100 shadow-sm space-y-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                <Layers size={16} className="text-violet-600" />
+                Aturan Grosir Min. Qty & Harga Bertingkat
+              </h2>
+              <span className="text-xs font-bold text-violet-700 bg-violet-50 px-2.5 py-1 rounded-xl border border-violet-200">
+                ⚡ Otomatis di POS Kasir
+              </span>
+            </div>
+
+            {/* Mode Penentuan Harga */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">Model Penentuan Harga Grosir</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, minQtyPricingMode: 'fixed' })}
+                  className={`p-3 rounded-2xl border text-left transition-all ${
+                    formData.minQtyPricingMode === 'fixed'
+                      ? 'border-violet-600 bg-violet-50 text-violet-900 shadow-xs'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                  }`}
+                >
+                  <p className="text-xs font-black">Harga Khusus Tetap (Rp)</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Misal: Rp8.600 / pcs (Populer)</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, minQtyPricingMode: 'nominal_cut', discountType: 'fixed' })}
+                  className={`p-3 rounded-2xl border text-left transition-all ${
+                    formData.minQtyPricingMode === 'nominal_cut'
+                      ? 'border-violet-600 bg-violet-50 text-violet-900 shadow-xs'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                  }`}
+                >
+                  <p className="text-xs font-black">Potongan Diskon (Rp)</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Misal: Potong Rp800 / pcs</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, minQtyPricingMode: 'percentage', discountType: 'percentage' })}
+                  className={`p-3 rounded-2xl border text-left transition-all ${
+                    formData.minQtyPricingMode === 'percentage'
+                      ? 'border-violet-600 bg-violet-50 text-violet-900 shadow-xs'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                  }`}
+                >
+                  <p className="text-xs font-black">Diskon Persentase (%)</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Misal: Diskon 10%</p>
+                </button>
+              </div>
+            </div>
+
+            {/* Tingkat Utama (Tier 1) */}
+            <div className="p-4 bg-violet-50/50 rounded-2xl border border-violet-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-violet-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-violet-600" />
+                  Tingkat 1 (Tier Utama)
+                </span>
+                {selectedProduct && (
+                  <span className="text-[11px] text-slate-500 font-bold">
+                    Harga Normal: <strong className="text-slate-800">{idr(selectedProduct.price)}</strong>
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Min. Pembelian (Pcs) *</label>
+                  <input
+                    type="number"
+                    min={2}
+                    required
+                    value={formData.minQty || 3}
+                    onChange={(e) => setFormData({ ...formData, minQty: Math.max(2, Number(e.target.value)) })}
+                    placeholder="Contoh: 3"
+                    className="w-full px-3.5 py-2.5 bg-white border border-violet-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    {formData.minQtyPricingMode === 'fixed'
+                      ? 'Harga Khusus Grosir (Rp/pcs) *'
+                      : formData.minQtyPricingMode === 'percentage'
+                      ? 'Persentase Diskon (%) *'
+                      : 'Potongan Diskon (Rp/pcs) *'}
+                  </label>
+                  {formData.minQtyPricingMode === 'fixed' ? (
+                    <input
+                      type="number"
+                      min={100}
+                      required
+                      value={formData.customTierPrice || ''}
+                      onChange={(e) => setFormData({ ...formData, customTierPrice: Number(e.target.value) })}
+                      placeholder={selectedProduct ? `Contoh: ${Math.round(selectedProduct.price * 0.9)}` : 'Contoh: 8600'}
+                      className="w-full px-3.5 py-2.5 bg-white border border-violet-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      min={1}
+                      required
+                      value={formData.discountValue || ''}
+                      onChange={(e) => setFormData({ ...formData, discountValue: Number(e.target.value) })}
+                      placeholder={formData.minQtyPricingMode === 'percentage' ? 'Contoh: 10' : 'Contoh: 800'}
+                      className="w-full px-3.5 py-2.5 bg-white border border-violet-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500"
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Label Tingkat (Opsional)</label>
+                  <input
+                    type="text"
+                    value={formData.tierLabel || ''}
+                    onChange={(e) => setFormData({ ...formData, tierLabel: e.target.value })}
+                    placeholder={`Contoh: Grosir min ${formData.minQty || 3}`}
+                    className="w-full px-3.5 py-2.5 bg-white border border-violet-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Multi-Tier Repeater (Tier 2, 3...) */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black text-slate-800 uppercase tracking-tight">Tingkatan Bertingkat Lainnya</p>
+                  <p className="text-[11px] text-slate-400">Misal: Min. 12 pcs lebih murah lagi (lusinan/kartonan)</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentRules = formData.tierRules || [];
+                    const nextMin = (formData.minQty || 3) * (currentRules.length + 2);
+                    setFormData({
+                      ...formData,
+                      tierRules: [
+                        ...currentRules,
+                        { minQty: nextMin, price: 0, label: `Grosir min ${nextMin}` }
+                      ]
+                    });
+                  }}
+                  className="px-3 py-1.5 bg-violet-50 text-violet-700 hover:bg-violet-100 border border-violet-200 rounded-xl text-xs font-black transition-colors flex items-center gap-1.5 shadow-2xs"
+                >
+                  <Plus size={13} />
+                  <span>+ Tambah Tier</span>
+                </button>
+              </div>
+
+              {formData.tierRules && formData.tierRules.length > 0 && (
+                <div className="space-y-2">
+                  {formData.tierRules.map((rule, idx) => (
+                    <div key={idx} className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                      <span className="text-xs font-black text-slate-500 w-16 shrink-0">Tier {idx + 2}</span>
+                      <div className="flex-1 grid grid-cols-3 gap-2">
+                        <input
+                          type="number"
+                          min={formData.minQty ? formData.minQty + 1 : 4}
+                          value={rule.minQty}
+                          onChange={(e) => {
+                            const updated = [...(formData.tierRules || [])];
+                            updated[idx].minQty = Number(e.target.value);
+                            setFormData({ ...formData, tierRules: updated });
+                          }}
+                          placeholder="Min. Qty"
+                          className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
+                        />
+                        <input
+                          type="number"
+                          min={100}
+                          value={rule.price || ''}
+                          onChange={(e) => {
+                            const updated = [...(formData.tierRules || [])];
+                            updated[idx].price = Number(e.target.value);
+                            setFormData({ ...formData, tierRules: updated });
+                          }}
+                          placeholder="Harga (Rp/pcs)"
+                          className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
+                        />
+                        <input
+                          type="text"
+                          value={rule.label || ''}
+                          onChange={(e) => {
+                            const updated = [...(formData.tierRules || [])];
+                            updated[idx].label = e.target.value;
+                            setFormData({ ...formData, tierRules: updated });
+                          }}
+                          placeholder="Label (Grosir min...)"
+                          className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = [...(formData.tierRules || [])];
+                          updated.splice(idx, 1);
+                          setFormData({ ...formData, tierRules: updated });
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Sinkronisasi Otomatis Checkbox */}
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-slate-800">Sinkronkan ke Tingkatan Harga Produk</p>
+                <p className="text-[11px] text-slate-400">Otomatis memperbarui aturan harga grosir di Kasir POS dan Katalog Toko Online</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={formData.applyToProductTiers ?? true}
+                onChange={(e) => setFormData({ ...formData, applyToProductTiers: e.target.checked })}
+                className="w-5 h-5 accent-violet-600 rounded cursor-pointer"
+              />
+            </div>
+
+            {/* LIVE HPP & MARGIN SIMULATOR WIDGET */}
+            {marginSimulation && (
+              <div className={`mt-4 p-4 rounded-2xl border transition-all ${
+                marginSimulation.isBoncos
+                  ? 'bg-rose-50/90 border-rose-300'
+                  : marginSimulation.isMarginTipis
+                  ? 'bg-amber-50/80 border-amber-300'
+                  : 'bg-emerald-50/80 border-emerald-200'
+              }`}>
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    {marginSimulation.isBoncos ? (
+                      <ShieldAlert className="text-rose-600 flex-shrink-0" size={20} />
+                    ) : marginSimulation.isMarginTipis ? (
+                      <AlertTriangle className="text-amber-600 flex-shrink-0" size={20} />
+                    ) : (
+                      <ShieldCheck className="text-emerald-600 flex-shrink-0" size={20} />
+                    )}
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-tight">
+                        {marginSimulation.isBoncos
+                          ? '🚨 BAHAYA BONCOS: Harga Grosir di Bawah Modal (HPP)!'
+                          : marginSimulation.isMarginTipis
+                          ? '⚠️ PERHATIAN: Margin Sangat Tipis (< 10%)'
+                          : '✅ PROFIT AMAN: Margin Grosir Sehat & Terkendali'}
+                      </h4>
+                      <p className="text-xs font-medium text-slate-500 mt-0.5">
+                        Simulasi langsung berdasarkan data modal produk di gudang
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`text-xs font-black px-2.5 py-1 rounded-xl ${
+                    marginSimulation.isBoncos
+                      ? 'bg-rose-600 text-white'
+                      : marginSimulation.isMarginTipis
+                      ? 'bg-amber-600 text-white'
+                      : 'bg-emerald-600 text-white'
+                  }`}>
+                    Margin {marginSimulation.marginPersen.toFixed(1)}%
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-black/5 text-xs">
+                  <div>
+                    <span className="text-xs text-slate-400 font-bold block">Harga Normal Eceran</span>
+                    <strong className="text-slate-800">{idr(marginSimulation.normalPrice)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-400 font-bold block">Modal Produk (HPP)</span>
+                    <strong className="text-slate-800">{idr(marginSimulation.modalHPP)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-400 font-bold block">Harga Grosir (Min {formData.minQty || 3} pcs)</span>
+                    <strong className="text-violet-700">{idr(marginSimulation.promoPrice)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-xs text-slate-400 font-bold block">Laba Bersih / Pcs</span>
+                    <strong className={marginSimulation.isBoncos ? 'text-rose-600' : 'text-emerald-600'}>
+                      {marginSimulation.isBoncos ? '−' : '+'}{idr(marginSimulation.labaBersihPerUnit)}
+                    </strong>
+                  </div>
+                </div>
+
+                {marginSimulation.isBoncos && (
+                  <label className="mt-3 pt-3 border-t border-rose-200 flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.allowLossLeader || false}
+                      onChange={(e) => setFormData({ ...formData, allowLossLeader: e.target.checked })}
+                      className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500"
+                    />
+                    <span className="text-xs font-bold text-rose-800">
+                      Saya sadar dan mengonfirmasi ini adalah strategi <em>Loss Leader</em> (diskon di bawah modal untuk pancingan pelanggan baru).
+                    </span>
+                  </label>
+                )}
+              </div>
+            )}
+          </div>
+        ) : formData.type !== 'buy-x-get-y' && (
           <div className="bg-white p-5 md:p-7 rounded-3xl border border-slate-100 shadow-sm space-y-4">
             <h2 className="text-sm font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
               <Percent size={16} className="text-emerald-600" />Skema Potongan Harga
