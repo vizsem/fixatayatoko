@@ -373,14 +373,19 @@ export default function CashierPOS() {
     }
     if (product.stock <= 0) return toast.error("Stok habis!");
 
-    const code = (unit.code || product.unit || 'PCS').toUpperCase();
-    const contains = Number(unit.contains || (code === 'PCS' ? 1 : 0));
+    const baseUnit = (product.unit || 'PCS').toUpperCase();
+    const code = (unit.code || baseUnit).toUpperCase();
+    const contains = Number(unit.contains || (code === baseUnit ? 1 : 0));
+    const isBaseUnit = code === baseUnit || contains <= 1;
     
     if (contains > product.stock) return toast.error(`Stok tidak cukup untuk satuan ini! Butuh: ${contains}, Sisa: ${product.stock}`);
 
     const channel = getChannelKey(transactionType);
     
-    let unitPrice = Number(unit.price || (contains > 0 ? product.price * contains : product.price));
+    // Untuk satuan dasar, gunakan harga ecer produk (bukan harga grosir-min yang ada di unit PCS duplikat)
+    let unitPrice = isBaseUnit
+      ? product.price
+      : Number(unit.price || (contains > 0 ? product.price * contains : product.price));
     const chPrice = (product.channelPricing as ChannelPricing)?.[channel]?.[code]?.price;
 
     if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
@@ -3341,34 +3346,60 @@ Tetap lanjutkan menyimpan harga ini?`
                           onChange={(e) => {
                             const prod = products.find(p => p.id === item.id);
                             const code = e.target.value;
-                            const u = prod?.units?.find(u => u.code === code) || { code, contains: code === 'PCS' ? 1 : 0, price: 0 };
-                            const contains = Number(u.contains || (code === 'PCS' ? 1 : 0));
-                            const channel = getChannelKey(transactionType);
-                            let unitPrice = Number(u.price || (contains > 0 ? (prod?.price || 0) * contains : (prod?.price || 0)));
-                            const chPrice = (prod?.channelPricing as ChannelPricing)?.[channel]?.[code]?.price;
+                            const baseUnit = (prod?.unit || 'PCS').toUpperCase();
 
+                            // Untuk satuan dasar (PCS): ambil entry tanpa minQty (harga ecer normal),
+                            // bukan entry "Grosir min 3" yang juga berkode PCS
+                            const u = code === baseUnit
+                              ? (prod?.units?.find(u => u.code === code && (!u.minQty || Number(u.minQty) === 0))
+                                 || prod?.units?.find(u => u.code === code)
+                                 || { code, contains: 1, price: prod?.price || 0 })
+                              : (prod?.units?.find(u => u.code === code)
+                                 || { code, contains: 0, price: 0 });
+
+                            const contains = Number(u.contains || (code === baseUnit ? 1 : 0));
+                            const channel = getChannelKey(transactionType);
+
+                            // Untuk satuan dasar, selalu pakai harga ecer (prod.price) agar tidak ada diskon palsu
+                            let unitPrice = code === baseUnit
+                              ? (prod?.price || 0)
+                              : Number(u.price || (contains > 0 ? (prod?.price || 0) * contains : (prod?.price || 0)));
+
+                            const chPrice = (prod?.channelPricing as ChannelPricing)?.[channel]?.[code]?.price;
                             if (typeof chPrice === 'number' && !Number.isNaN(chPrice)) {
                               unitPrice = chPrice;
                             } else if ((channel === 'shopee' || channel === 'tiktok') && (prod?.channelPricing as ChannelPricing)?.['website']?.[code]?.price) {
                               unitPrice = (prod?.channelPricing as ChannelPricing)['website']![code].price!;
                             }
+
                             const minQty = Number(u.minQty || 0);
-                            const unitCost = (prod?.cost || 0) * contains;
-                            const unitOriginalPrice = (prod?.price || 0) * contains;
+                            const unitCost = (prod?.cost || 0) * Math.max(contains, 1);
+                            // originalPrice = harga ecer × isi (referensi harga penuh tanpa diskon)
+                            const unitOriginalPrice = (prod?.price || 0) * Math.max(contains, 1);
+
                             setCart(prev => prev.map(ci => {
                               if (ci.id !== item.id) return ci;
                               const nextQty = minQty && ci.quantity < minQty ? minQty : ci.quantity;
                               if (minQty && ci.quantity < minQty) toast.success(`Min. qty ${code}: ${minQty}. Qty disesuaikan.`);
-                              return { ...ci, unit: code, contains, price: unitPrice, originalPrice: unitOriginalPrice, cost: unitCost, quantity: nextQty, channel };
+                              return { ...ci, unit: code, contains: Math.max(contains, code === baseUnit ? 1 : contains), price: unitPrice, originalPrice: unitOriginalPrice, cost: unitCost, quantity: nextQty, channel, appliedTier: 'Retail' };
                             }));
                           }}
                           className="text-xs font-bold text-gray-600 bg-white border rounded-lg px-2 py-1"
                         >
-                          {(products.find(p => p.id === item.id)?.units || [{ code: 'PCS', contains: 1 }]).map(u => (
-                            <option key={u.code} value={u.code}>
-                              {u.code}{u.contains && u.contains > 1 ? ` (Isi ${u.contains})` : ''}
-                            </option>
-                          ))}
+                          {/* Deduplicate units by code – tampilkan hanya 1 opsi per kode satuan */}
+                          {(() => {
+                            const allUnits = products.find(p => p.id === item.id)?.units || [{ code: 'PCS', contains: 1 }];
+                            const seen = new Set<string>();
+                            return allUnits.filter(u => {
+                              if (seen.has(u.code)) return false;
+                              seen.add(u.code);
+                              return true;
+                            }).map(u => (
+                              <option key={u.code} value={u.code}>
+                                {u.code}{u.contains && u.contains > 1 ? ` (Isi ${u.contains})` : ''}
+                              </option>
+                            ));
+                          })()}
                         </select>
                       </div>
                     </div>
