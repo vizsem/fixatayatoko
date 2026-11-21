@@ -1252,8 +1252,9 @@ Tetap lanjutkan menyimpan harga ini?`
             return;
           }
 
-          // --- SHIFT CACHE: Cek sessionStorage dulu untuk menghindari modal berulang ---
-          const cachedShiftRaw = sessionStorage.getItem('pos-current-shift');
+          // --- SHIFT CACHE: Cek localStorage/sessionStorage agar tidak minta modal saat refresh ---
+          const cachedShiftRaw = (typeof window !== 'undefined' ? localStorage.getItem('pos-current-shift') : null) || 
+                                 (typeof window !== 'undefined' ? sessionStorage.getItem('pos-current-shift') : null);
           if (cachedShiftRaw) {
             try {
               const cachedShift = JSON.parse(cachedShiftRaw) as CashierShift;
@@ -1261,42 +1262,77 @@ Tetap lanjutkan menyimpan harga ini?`
               if (cachedShift.cashierId === supaUser.id) {
                 setCurrentShift(cachedShift);
                 setLoading(false);
-                // Background verification: pastikan shift masih OPEN di DB
+                // Background verification: pastikan shift masih OPEN di DB (cek kolom fisik & raw_data)
                 supabase
                   .from('cashier_shifts')
-                  .select('id, status')
+                  .select('*')
                   .eq('id', cachedShift.id)
                   .maybeSingle()
-                  .then(({ data }) => {
-                    if (!data || data.status !== 'OPEN') {
-                      // Shift sudah ditutup dari tempat lain, hapus cache
-                      sessionStorage.removeItem('pos-current-shift');
-                      setCurrentShift(null);
-                      setShowShiftModal('open');
+                  .then(
+                    ({ data }) => {
+                      if (data) {
+                        const raw = data.raw_data || {};
+                        const dbStatus = (data.status || raw.status || '').toUpperCase();
+                        if (dbStatus && dbStatus !== 'OPEN') {
+                          // Shift sudah resmi ditutup (CLOSED), bersihkan cache dan minta buka shift baru
+                          localStorage.removeItem('pos-current-shift');
+                          sessionStorage.removeItem('pos-current-shift');
+                          setCurrentShift(null);
+                          setShowShiftModal('open');
+                        }
+                      }
+                    },
+                    () => {
+                      // Abaikan error jaringan saat background check agar kasir tidak terganggu offline
                     }
-                  });
+                  );
                 return;
               }
             } catch {
+              localStorage.removeItem('pos-current-shift');
               sessionStorage.removeItem('pos-current-shift');
             }
           }
 
-          // Tidak ada cache valid – query Supabase
-          const { data: openShift } = await supabase
+          // Tidak ada cache valid – query Supabase untuk mencari shift aktif (OPEN) milik kasir ini
+          const { data: recentShifts } = await supabase
             .from('cashier_shifts')
             .select('*')
-            .eq('cashier_id', supaUser.id)
-            .eq('status', 'OPEN')
-            .limit(1)
-            .maybeSingle();
+            .order('created_at', { ascending: false })
+            .limit(20);
 
-          if (openShift) {
-            const shift = { id: openShift.id, ...openShift } as CashierShift;
+          const activeShiftRow = (recentShifts || []).find((s: any) => {
+            const raw = s.raw_data || {};
+            const status = (s.status || raw.status || '').toUpperCase();
+            const cId = raw.cashierId || s.cashier_id;
+            return status === 'OPEN' && (!cId || cId === supaUser.id);
+          });
+
+          if (activeShiftRow) {
+            const raw = activeShiftRow.raw_data || {};
+            const shift: CashierShift = {
+              id: activeShiftRow.id,
+              cashierId: raw.cashierId || activeShiftRow.cashier_id || supaUser.id,
+              cashierName: raw.cashierName || activeShiftRow.cashier_name || supaUser.user_metadata?.full_name || 'Kasir',
+              openedAt: activeShiftRow.created_at || raw.openedAt || new Date().toISOString(),
+              closedAt: raw.closedAt || null,
+              initialCash: Number(raw.initialCash ?? activeShiftRow.initial_cash ?? 0),
+              expectedCash: Number(raw.expectedCash ?? activeShiftRow.expected_cash ?? 0),
+              actualCash: raw.actualCash !== undefined ? Number(raw.actualCash) : null,
+              difference: raw.difference !== undefined ? Number(raw.difference) : null,
+              status: 'OPEN',
+              totalCashSales: Number(raw.totalCashSales ?? 0),
+              totalNonCashSales: Number(raw.totalNonCashSales ?? 0),
+              notes: raw.notes || ''
+            };
             setCurrentShift(shift);
-            // Simpan ke cache untuk navigasi berikutnya
-            sessionStorage.setItem('pos-current-shift', JSON.stringify(shift));
+            // Simpan ke storage untuk refresh berikutnya
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('pos-current-shift', JSON.stringify(shift));
+              sessionStorage.setItem('pos-current-shift', JSON.stringify(shift));
+            }
           } else {
+            // Belum ada shift yang OPEN (kasir baru atau setelah ganti shift/tutup shift)
             setShowShiftModal('open');
           }
         } catch (e) {
@@ -1981,8 +2017,11 @@ Tetap lanjutkan menyimpan harga ini?`
       const ref = await sbInsertDoc('cashier_shifts', newShift);
       const openedShift = { id: ref.id, ...newShift } as CashierShift;
       setCurrentShift(openedShift);
-      // Simpan ke sessionStorage agar tidak muncul modal saat pindah tab
-      sessionStorage.setItem('pos-current-shift', JSON.stringify(openedShift));
+      // Simpan ke localStorage & sessionStorage agar shift bertahan saat refresh/pindah tab
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('pos-current-shift', JSON.stringify(openedShift));
+        sessionStorage.setItem('pos-current-shift', JSON.stringify(openedShift));
+      }
       setShowShiftModal(null);
       setShiftInput({ cashierName: enteredName, initialCash: '', actualCash: '', notes: '' });
       toast.success('Kasir Dibuka!');
@@ -2087,8 +2126,11 @@ Tetap lanjutkan menyimpan harga ini?`
       setShowShiftModal(null);
       setShiftInput({ cashierName: '', initialCash: '', actualCash: '', notes: '' });
       setShiftSummary(null);
-      // Hapus cache shift agar modal muncul kembali saat kasir dibuka berikutnya
-      sessionStorage.removeItem('pos-current-shift');
+      // Hapus cache shift agar saat kasir dibuka berikutnya (ganti shift baru), kasir wajib input modal awal baru
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('pos-current-shift');
+        sessionStorage.removeItem('pos-current-shift');
+      }
       toast.success('Kasir Ditutup!');
       router.push('/profil');
     } catch (e) {
