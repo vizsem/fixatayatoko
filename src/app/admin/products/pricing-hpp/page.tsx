@@ -132,6 +132,7 @@ export default function PricingHPPPage() {
   const [marginFilter, setMarginFilter] = useState<'ALL' | 'HEALTHY' | 'SLIM' | 'CRITICAL' | 'NEGATIVE' | 'NEEDS_REVIEW'>('ALL');
   const [variantFilter, setVariantFilter] = useState<'ALL' | 'VARIANTS' | 'PARENTS' | 'REGULAR'>('ALL');
   const [taxFilter, setTaxFilter] = useState<'ALL' | 'TAXABLE' | 'EXEMPT' | 'PPH22'>('ALL');
+  const [wholesaleFilter, setWholesaleFilter] = useState<'ALL' | 'ONLY_TIER' | 'NO_TIER'>('ALL');
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
   const [sortBy, setSortBy] = useState<'urgent_first' | 'po_latest' | 'name' | 'marginPct_desc' | 'marginPct_asc' | 'cost_desc' | 'price_desc' | 'stock_desc' | 'avg_diff'>('urgent_first');
 

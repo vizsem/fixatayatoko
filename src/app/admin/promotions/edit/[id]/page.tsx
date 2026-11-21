@@ -72,6 +72,7 @@ type Product = {
   costPrice: number;
   stock: number;
   imageUrl?: string;
+  isActive: boolean;
 };
 
 const idr = (n: number) => `Rp${Math.abs(n).toLocaleString('id-ID')}`;
@@ -117,18 +118,30 @@ export default function EditPromotionPage() {
   const loadSupportingData = useCallback(async () => {
     try {
       const snap = await sbGetDocs({ table: 'products' });
-      const list: Product[] = snap.docs.map((d) => {
-        const data = d.data() as any;
-        return {
-          id: d.id,
-          name: String(data.name || data.Nama || 'Produk'),
-          category: String(data.category || data.Kategori || 'Umum'),
-          price: Number(data.priceEcer ?? data.price ?? data.Ecer ?? 0),
-          costPrice: Number(data.Modal ?? data.purchasePrice ?? data.costPrice ?? data.modal ?? 0),
-          stock: Number(data.stock ?? data.Stok ?? 0),
-          imageUrl: String(data.imageUrl || data.image || data.Link_Foto || ''),
-        };
-      });
+      const list: Product[] = snap.docs
+        .map((d) => {
+          const data = d.data() as any;
+          const raw = data.raw_data || data;
+          const isActive =
+            data.is_active !== false &&
+            raw.isActive !== false &&
+            raw.isActive !== 'false' &&
+            raw.status !== 'ARCHIVED' &&
+            raw.status !== 'DRAFT' &&
+            raw.isDraft !== true &&
+            raw.isArchived !== true;
+          return {
+            id: d.id,
+            name: String(data.name || data.Nama || raw.Nama || 'Produk'),
+            category: String(data.category || data.Kategori || raw.Kategori || 'Umum'),
+            price: Number(data.priceEcer ?? data.price ?? data.Ecer ?? raw.Ecer ?? 0),
+            costPrice: Number(data.Modal ?? data.purchasePrice ?? data.costPrice ?? data.modal ?? raw.Modal ?? 0),
+            stock: Number(data.stock ?? data.Stok ?? raw.Stok ?? 0),
+            imageUrl: String(data.imageUrl || data.image || data.Link_Foto || raw.Link_Foto || ''),
+            isActive,
+          };
+        })
+        .filter((p) => p.isActive); // Hanya tampilkan produk aktif
 
       setProducts(list);
       const uniqueCategories = new Set(list.map((p) => p.category).filter(Boolean));

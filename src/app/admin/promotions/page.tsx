@@ -148,6 +148,17 @@ export default function PromotionsPage() {
         const prodId = d.id;
         const prodName = String(prodData.name || raw.Nama || raw.name || 'Produk');
 
+        // Hanya produk AKTIF yang bisa jadi target promosi
+        const isProductActive =
+          prodData.is_active !== false &&
+          raw.isActive !== false &&
+          raw.isActive !== 'false' &&
+          raw.status !== 'ARCHIVED' &&
+          raw.status !== 'DRAFT' &&
+          raw.isDraft !== true &&
+          raw.isArchived !== true;
+        if (!isProductActive) continue;
+
         if (existingMinQtyTargetIds.has(prodId)) continue;
 
         const tiers = extractProductMinQtyTiers(prodData);
@@ -168,7 +179,7 @@ export default function PromotionsPage() {
             targetName: prodName,
             startDate: new Date(Date.now() - 30 * 86400000).toISOString(),
             endDate: '2099-12-31T23:59:59.000Z',
-            isActive: prodData.is_active !== false && raw.isActive !== false,
+            isActive: true, // Sudah difilter; hanya produk aktif yang masuk sini
             createdAt: prodData.created_at || new Date().toISOString(),
             applyToProductTiers: true,
             minQtyPricingMode: 'fixed',
