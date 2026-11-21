@@ -9,11 +9,11 @@ import {
   Plus, Edit, Trash2, Gift, Tag, Calendar,
   AlertTriangle, Zap, Layers, Clock, ShieldCheck,
   ShieldAlert, Sparkles, ShoppingBag, DollarSign,
-  BarChart3, CheckCircle2, Power, Search, Filter
+  BarChart3, CheckCircle2, Power, Search, Filter, RefreshCw
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
-import { sbDeleteDoc, sbGetDocs, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { sbDeleteDoc, sbGetDocs, sbInsertDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
 import { PromoType } from './add/page';
 
 type Promotion = {
@@ -56,6 +56,7 @@ const idr = (n: number) => `Rp${Math.abs(n).toLocaleString('id-ID')}`;
 export default function PromotionsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,28 +74,142 @@ export default function PromotionsPage() {
     }
   }, [authLoading, adminId]);
 
-  // Fetch promosi real-time via Supabase
+  // Helper untuk mengekstrak aturan minQty dari produk
+  const extractProductMinQtyTiers = (p: any) => {
+    const raw = p.raw_data || p;
+    let tiers: Array<{ minQty: number; price: number; label?: string }> = [];
+
+    if (Array.isArray(raw.priceTiers) && raw.priceTiers.length > 0) {
+      tiers = raw.priceTiers
+        .filter((t: any) => Number(t.minQty) > 1 && Number(t.price) > 0)
+        .map((t: any) => ({
+          minQty: Number(t.minQty),
+          price: Number(t.price),
+          label: t.label || `Opening min ${t.minQty}`,
+        }))
+        .sort((a: any, b: any) => a.minQty - b.minQty);
+    }
+
+    if (tiers.length === 0) {
+      const grosir = Number(raw.Grosir ?? raw.wholesalePrice ?? raw.priceGrosir ?? 0);
+      const minG = Number(raw.Min_Grosir ?? raw.minWholesale ?? raw.minGrosir ?? raw.minQty ?? 0);
+      if (grosir > 0 && minG > 1) {
+        tiers = [
+          {
+            minQty: minG,
+            price: grosir,
+            label: `Opening min ${minG}`,
+          },
+        ];
+      }
+    }
+
+    if (tiers.length === 0 && Array.isArray(raw.units)) {
+      for (const u of raw.units) {
+        if (u && Number(u.minQty) > 1 && Number(u.price) > 0) {
+          tiers.push({
+            minQty: Number(u.minQty),
+            price: Number(u.price),
+            label: u.label || `Opening min ${u.minQty}`,
+          });
+        }
+      }
+      tiers.sort((a, b) => a.minQty - b.minQty);
+    }
+
+    return tiers;
+  };
+
+  // Sinkronisasi produk yang sudah memiliki minQty ke tabel promotions
+  const syncMinQtyProducts = async (isManual = false) => {
+    setSyncing(true);
+    try {
+      const [promoSnap, prodSnap] = await Promise.all([
+        sbGetDocs({ table: 'promotions' }),
+        sbGetDocs({ table: 'products' }),
+      ]);
+
+      const existingPromos = promoSnap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Promotion[];
+
+      const existingMinQtyTargetIds = new Set(
+        existingPromos
+          .filter((p) => p.type === 'min-qty' && p.targetId)
+          .map((p) => p.targetId)
+      );
+
+      const newlyAdded: Promotion[] = [];
+
+      for (const d of prodSnap.docs) {
+        const prodData = d.data() as any;
+        const raw = prodData.raw_data || prodData;
+        const prodId = d.id;
+        const prodName = String(prodData.name || raw.Nama || raw.name || 'Produk');
+
+        if (existingMinQtyTargetIds.has(prodId)) continue;
+
+        const tiers = extractProductMinQtyTiers(prodData);
+        if (tiers.length > 0) {
+          const primary = tiers[0];
+          const additional = tiers.slice(1);
+
+          const promoPayload: Omit<Promotion, 'id'> = {
+            name: `Opening - ${prodName}`,
+            type: 'min-qty',
+            discountType: 'fixed',
+            discountValue: primary.price,
+            customTierPrice: primary.price,
+            minQty: primary.minQty,
+            tierLabel: primary.label || `Opening min ${primary.minQty}`,
+            tierRules: additional,
+            targetId: prodId,
+            targetName: prodName,
+            startDate: new Date(Date.now() - 30 * 86400000).toISOString(),
+            endDate: '2099-12-31T23:59:59.000Z',
+            isActive: prodData.is_active !== false && raw.isActive !== false,
+            createdAt: prodData.created_at || new Date().toISOString(),
+            applyToProductTiers: true,
+            minQtyPricingMode: 'fixed',
+          };
+
+          try {
+            const ref = await sbInsertDoc('promotions', promoPayload);
+            newlyAdded.push({ id: ref.id, ...promoPayload });
+            existingMinQtyTargetIds.add(prodId);
+          } catch (e) {
+            console.warn('Gagal insert sync promo:', e);
+            // Tetap tambahkan ke in-memory jika gagal insert agar tampil di UI
+            newlyAdded.push({ id: `promo_${prodId}`, ...promoPayload });
+          }
+        }
+      }
+
+      const allPromos = [...existingPromos, ...newlyAdded];
+      allPromos.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      setPromotions(allPromos);
+
+      if (isManual) {
+        if (newlyAdded.length > 0) {
+          notify.admin.success(`Berhasil memunculkan ${newlyAdded.length} produk program Opening Min. Qty!`);
+        } else {
+          notify.admin.info('Semua produk dengan Min. Qty sudah sinkron di program promosi.');
+        }
+      }
+    } catch (err) {
+      console.error('Error syncing promotions:', err);
+      if (isManual) notify.admin.error('Gagal menyinkronkan produk promosi.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Fetch promosi & auto-sync saat halaman pertama kali dimuat
   useEffect(() => {
     if (loading) return;
 
-    const fetchPromotions = async () => {
-      try {
-        const snap = await sbGetDocs({ table: 'promotions' });
-        const promoList = snap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Promotion[];
-
-        promoList.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        setPromotions(promoList);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching promotions:', err);
-        setError('Gagal memuat data promosi.');
-      }
-    };
-
-    fetchPromotions();
+    syncMinQtyProducts(false);
 
     const channel = supabase
       .channel('admin_promotions_realtime')
@@ -102,7 +217,14 @@ export default function PromotionsPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'promotions' },
         () => {
-          fetchPromotions();
+          sbGetDocs({ table: 'promotions' }).then((snap) => {
+            const list = snap.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            })) as Promotion[];
+            list.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+            setPromotions(list);
+          });
         }
       )
       .subscribe();
@@ -246,6 +368,15 @@ export default function PromotionsPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => syncMinQtyProducts(true)}
+            disabled={syncing}
+            className="px-4 py-2.5 bg-white text-violet-700 hover:bg-violet-50 border border-violet-200 rounded-xl text-xs font-black transition-all flex items-center gap-2 shadow-sm disabled:opacity-60"
+            title="Pindai dan munculkan produk yang sudah disetting Min. Qty / Grosir sebagai program promosi Opening"
+          >
+            <RefreshCw size={15} className={`text-violet-600 ${syncing ? 'animate-spin' : ''}`} />
+            <span>{syncing ? 'Menyinkronkan...' : 'Sinkronkan Grosir Min. Qty'}</span>
+          </button>
           <Link
             href="/admin/reports/promotions"
             className="px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 rounded-xl text-xs font-black transition-all flex items-center gap-2"
@@ -327,6 +458,15 @@ export default function PromotionsPage() {
               >
                 <Icon size={13} />
                 <span>{t.label}</span>
+                {t.id !== 'ALL' && promotions.some((p) => p.type === t.id) && (
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none ${
+                      isSelected ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {promotions.filter((p) => p.type === t.id).length}
+                  </span>
+                )}
               </button>
             );
           })}
