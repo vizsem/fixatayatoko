@@ -1418,19 +1418,19 @@ Tetap lanjutkan menyimpan harga ini?`
           console.warn('Quota exceeded caching pos-products:', storageErr);
         }
 
-        // Fetch categories from master table (not derived from active products)
-        // so ALL categories appear even if their products are currently filtered out.
-        const { data: catRows } = await supabase
-          .from('categories')
-          .select('name')
-          .order('name', { ascending: true });
-        const masterCats = (catRows || []).map((c: any) => String(c.name).trim().toUpperCase()).filter(Boolean);
-        // Augment with any category found in active products that may not be in master table
-        const productCats = Array.from(new Set(p.map(prod => String(prod.Kategori || prod.kategori || '').trim().toUpperCase()))).filter(Boolean) as string[];
-        const allCats = Array.from(new Set([...masterCats, ...productCats])).sort();
-        setCategories(allCats);
+        // Hanya ekstrak kategori dari produk berstatus AKTIF yang tersedia di kasir
+        const activeProductCats = Array.from(
+          new Set(
+            p
+              .map(prod => String(prod.Kategori || prod.kategori || '').trim().toUpperCase())
+              .filter(cat => cat && cat !== 'SEMUA' && cat !== 'SEMUA KATEGORI' && cat !== 'NULL' && cat !== 'UNDEFINED')
+          )
+        ).sort((a, b) => a.localeCompare(b, 'id-ID'));
+
+        setCategories(activeProductCats);
+        setSelectedCategory(prev => (prev === 'SEMUA' || activeProductCats.includes(prev) ? prev : 'SEMUA'));
         try {
-          localStorage.setItem('pos-cached-categories', JSON.stringify(allCats));
+          localStorage.setItem('pos-cached-categories', JSON.stringify(activeProductCats));
         } catch {}
       } catch (error) {
         console.error('Error fetching products:', error);
