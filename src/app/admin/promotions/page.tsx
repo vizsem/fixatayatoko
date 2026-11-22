@@ -9,7 +9,8 @@ import {
   Plus, Edit, Trash2, Gift, Tag, Calendar,
   AlertTriangle, Zap, Layers, Clock, ShieldCheck,
   ShieldAlert, Sparkles, ShoppingBag, DollarSign,
-  BarChart3, CheckCircle2, Power, Search, Filter, RefreshCw
+  BarChart3, CheckCircle2, Power, Search, Filter, RefreshCw,
+  ArrowRight, Package
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
@@ -63,6 +64,15 @@ export default function PromotionsPage() {
   // Filters
   const [activeTab, setActiveTab] = useState<'ALL' | PromoType>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Deteksi URL query param ?tab=min-qty
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const tab = p.get('tab');
+      if (tab) setActiveTab(tab as any);
+    }
+  }, []);
 
   // Proteksi admin
   const { authLoading, adminId } = useAdminAuth({ allowedRoles: ['admin'] as any });
@@ -495,10 +505,44 @@ export default function PromotionsPage() {
         </div>
       </div>
 
+      {/* BANNER KHUSUS TAB GROSIR MIN. QTY */}
+      {activeTab === 'min-qty' && (
+        <div className="mb-6 p-4 md:p-5 bg-gradient-to-r from-violet-50 via-purple-50 to-indigo-50 border border-violet-200 rounded-3xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start md:items-center gap-3.5">
+            <div className="p-3 bg-violet-600 text-white rounded-2xl shadow-md shadow-violet-200 shrink-0">
+              <Layers size={22} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm md:text-base font-black text-violet-950">
+                  Daftar Produk Grosir Min. Qty (Harga Bertingkat)
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-violet-200 text-violet-800">
+                  {filteredPromos.length} Produk
+                </span>
+              </div>
+              <p className="text-xs font-bold text-violet-700/80 mt-0.5">
+                Produk di bawah ini otomatis mendapatkan diskon harga grosir saat kasir menginput kuantiti tertentu di kasir POS.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/admin/products/pricing-hpp?filter=wholesale"
+            className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-violet-200 flex items-center gap-2 shrink-0 self-stretch md:self-auto justify-center"
+          >
+            <Package size={15} />
+            <span>Lihat Detail Modal HPP di Manajemen Harga</span>
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+      )}
+
       {/* PROMOTIONS LIST (Desktop Table + Mobile Cards) */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-extrabold text-slate-800 text-sm">Daftar Program Promosi</h3>
+          <h3 className="font-extrabold text-slate-800 text-sm">
+            {activeTab === 'min-qty' ? 'Katalog Produk Grosir Min. Qty' : 'Daftar Program Promosi'}
+          </h3>
           <span className="text-xs font-bold text-slate-400">{filteredPromos.length} program ditemukan</span>
         </div>
 
@@ -506,8 +550,80 @@ export default function PromotionsPage() {
         <div className="md:hidden divide-y divide-slate-100">
           {filteredPromos.length === 0 ? (
             <div className="p-12 text-center text-slate-400 font-bold text-xs">
-              Tidak ada program promosi di kategori ini
+              Tidak ada produk promosi di kategori ini
             </div>
+          ) : activeTab === 'min-qty' ? (
+            filteredPromos.map((promo) => {
+              const cleanTitle = promo.targetName || promo.name.replace(/^Opening\s*-\s*/i, '');
+              const allTiers = [
+                { minQty: promo.minQty || 3, price: promo.customTierPrice || promo.discountValue, label: promo.tierLabel || `Grosir min ${promo.minQty || 3}` },
+                ...(promo.tierRules || []).map(t => ({ minQty: t.minQty, price: t.price || 0, label: t.label || `Grosir min ${t.minQty}` }))
+              ];
+
+              return (
+                <div key={promo.id} className="p-4 space-y-3 bg-white">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900">{cleanTitle}</h4>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase bg-violet-100 text-violet-800 border border-violet-200">
+                          Grosir Min. Qty
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-400">
+                          Khusus PCS
+                        </span>
+                      </div>
+                    </div>
+                    <span className={`px-2 py-0.5 text-xs font-black rounded-lg ${
+                      promo.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {promo.isActive ? 'Aktif di Kasir' : 'Non-Aktif'}
+                    </span>
+                  </div>
+
+                  {/* Tier Harga List */}
+                  <div className="p-3 bg-violet-50/60 rounded-2xl border border-violet-100 space-y-1.5">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-violet-600">Aturan Harga Bertingkat:</p>
+                    <div className="grid grid-cols-1 gap-1">
+                      {allTiers.map((t, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-xs font-bold bg-white px-2.5 py-1.5 rounded-xl border border-violet-100/80">
+                          <span className="text-slate-600">Beli ≥ <b className="text-slate-900 font-black">{t.minQty} pcs</b></span>
+                          <span className="font-black text-violet-700">{idr(t.price)} <span className="text-[10px] font-bold text-slate-400">/ pcs</span></span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-50 text-xs">
+                    <button
+                      onClick={() => handleToggleActive(promo)}
+                      className={`px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 ${
+                        promo.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      <Power size={12} />
+                      <span>{promo.isActive ? 'Aktif' : 'Non-Aktif'}</span>
+                    </button>
+                    <div className="flex gap-2">
+                      <Link
+                        href={`/admin/promotions/edit/${promo.id}`}
+                        className="px-3 py-1.5 bg-blue-50 text-blue-600 font-bold rounded-xl flex items-center gap-1 text-xs"
+                      >
+                        <Edit size={13} />
+                        <span>Edit Tier</span>
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(promo.id, promo.name)}
+                        className="p-2 bg-rose-50 text-rose-600 rounded-xl"
+                        title="Hapus"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
           ) : (
             filteredPromos.map((promo) => {
               const expired = isExpired(promo.endDate);
@@ -519,10 +635,8 @@ export default function PromotionsPage() {
                     <div>
                       <h4 className="text-sm font-black text-slate-900">{promo.name}</h4>
                       <div className="flex items-center gap-1.5 mt-1">
-                        <span className={`px-2 py-0.5 rounded-lg text-xs font-black uppercase ${
-                          promo.type === 'min-qty' ? 'bg-violet-100 text-violet-800 border border-violet-200' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {promo.type === 'min-qty' ? 'Grosir Min. Qty' : promo.type}
+                        <span className="px-2 py-0.5 rounded-lg text-xs font-black uppercase bg-slate-100 text-slate-600">
+                          {promo.type}
                         </span>
                         {promo.code && (
                           <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-black bg-purple-50 text-purple-700 border border-purple-200">
@@ -550,9 +664,7 @@ export default function PromotionsPage() {
                   {/* Guardrail Badges */}
                   <div className="flex flex-wrap gap-1.5 text-xs font-bold">
                     <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg">
-                      {promo.type === 'min-qty'
-                        ? `Beli Min. ${promo.minQty || 3} pcs → ${promo.customTierPrice ? idr(promo.customTierPrice) : (promo.discountType === 'percentage' ? `${promo.discountValue}%` : idr(promo.discountValue))}`
-                        : promo.type === 'buy-x-get-y'
+                      {promo.type === 'buy-x-get-y'
                         ? `Beli ${promo.buyQty || 2} Gratis ${promo.freeQty || 1}`
                         : `Potongan: ${promo.discountType === 'percentage' ? `${promo.discountValue}%` : idr(promo.discountValue)}`}
                     </span>
@@ -606,156 +718,251 @@ export default function PromotionsPage() {
 
         {/* Desktop View Table */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50/70">
-              <tr>
-                {['Program Promosi', 'Model & Target', 'Diskon', 'Pengaman Finansial (Guardrail)', 'Periode', 'Status', 'Aksi'].map((h) => (
-                  <th key={h} className="px-5 py-3.5 text-xs font-black uppercase tracking-widest text-slate-400">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filteredPromos.length === 0 ? (
+          {activeTab === 'min-qty' ? (
+            /* TABEL KHUSUS GROSIR MIN. QTY */
+            <table className="w-full text-left">
+              <thead className="bg-slate-50/80">
                 <tr>
-                  <td colSpan={7} className="text-center py-16 text-slate-400 font-bold text-xs">
-                    Tidak ada program promosi yang sesuai filter
-                  </td>
+                  {['Produk Target', 'Aturan Harga Bertingkat (Min. Qty)', 'Satuan Berlaku', 'Status Kasir POS', 'Aksi'].map((h) => (
+                    <th key={h} className="px-5 py-3.5 text-xs font-black uppercase tracking-widest text-slate-400">
+                      {h}
+                    </th>
+                  ))}
                 </tr>
-              ) : (
-                filteredPromos.map((promo) => {
-                  const expired = isExpired(promo.endDate);
-                  const activeNow = isActiveNow(promo);
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredPromos.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="text-center py-16 text-slate-400 font-bold text-xs">
+                      Tidak ada produk dengan aturan Grosir Min. Qty
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPromos.map((promo) => {
+                    const cleanTitle = promo.targetName || promo.name.replace(/^Opening\s*-\s*/i, '');
+                    const allTiers = [
+                      { minQty: promo.minQty || 3, price: promo.customTierPrice || promo.discountValue, label: promo.tierLabel || `Grosir min ${promo.minQty || 3}` },
+                      ...(promo.tierRules || []).map(t => ({ minQty: t.minQty, price: t.price || 0, label: t.label || `Grosir min ${t.minQty}` }))
+                    ];
 
-                  return (
-                    <tr key={promo.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <div className="text-xs font-black text-slate-900">{promo.name}</div>
-                        {promo.code && (
-                          <div className="mt-1">
-                            <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-black bg-purple-50 text-purple-700 border border-purple-200">
-                              KODE: {promo.code}
+                    return (
+                      <tr key={promo.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-5 py-4">
+                          <div className="text-xs font-black text-slate-900">{cleanTitle}</div>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black uppercase bg-violet-100 text-violet-800 border border-violet-200">
+                              Program: Opening
+                            </span>
+                            {promo.targetId && (
+                              <span className="text-[10px] font-mono text-slate-400">
+                                ID: {promo.targetId.slice(0, 8)}...
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {allTiers.map((t, idx) => (
+                              <div key={idx} className="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-50 border border-violet-200/80 rounded-xl text-xs">
+                                <span className="font-bold text-slate-500">Min {t.minQty} pcs:</span>
+                                <span className="font-black text-violet-700">{idr(t.price)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="flex flex-col gap-0.5 text-xs">
+                            <span className="inline-flex items-center gap-1 font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg w-fit border border-emerald-200">
+                              ✓ Khusus PCS
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400">
+                              Satuan karton (CTN/RTG) tetap harga grosir karton
                             </span>
                           </div>
-                        )}
-                      </td>
+                        </td>
 
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`px-2 py-0.5 rounded-lg text-xs font-black uppercase ${
-                            promo.type === 'min-qty' ? 'bg-violet-100 text-violet-800 border border-violet-200' : 'bg-slate-100 text-slate-700'
-                          }`}>
-                            {promo.type === 'min-qty' ? 'Grosir Min. Qty' : promo.type}
-                          </span>
-                        </div>
-                        <p className="text-xs font-bold text-slate-500 mt-1 line-clamp-1">
-                          {promo.targetName || (promo.type === 'coupon' ? 'Semua Belanja' : '—')}
-                        </p>
-                      </td>
-
-                      <td className="px-5 py-3.5">
-                        <span className={`text-xs font-black ${promo.type === 'min-qty' ? 'text-violet-700' : 'text-emerald-600'}`}>
-                          {promo.type === 'min-qty' ? (
-                            <span>
-                              Min. {promo.minQty || 3} pcs → {promo.customTierPrice ? idr(promo.customTierPrice) : (promo.discountType === 'percentage' ? `${promo.discountValue}%` : idr(promo.discountValue))}
-                            </span>
-                          ) : promo.type === 'buy-x-get-y' ? (
-                            `Beli ${promo.buyQty || 2} Gratis ${promo.freeQty || 1}`
-                          ) : promo.discountType === 'percentage' ? (
-                            `${promo.discountValue}%`
-                          ) : (
-                            idr(promo.discountValue)
-                          )}
-                        </span>
-                      </td>
-
-                      <td className="px-5 py-3.5">
-                        <div className="flex flex-col gap-1 text-xs">
-                          {promo.type === 'min-qty' && (
-                            <span className="text-violet-700 font-bold">
-                              ⚡ {promo.tierLabel || `Grosir min ${promo.minQty || 3}`}
-                              {promo.tierRules && promo.tierRules.length > 0 && ` (+${promo.tierRules.length} tier)`}
-                            </span>
-                          )}
-                          {promo.minPurchase && promo.minPurchase > 0 ? (
-                            <span className="text-blue-700 font-bold">🛡️ Min. Belanja {idr(promo.minPurchase)}</span>
-                          ) : (
-                            <span className="text-slate-400">Tanpa min. belanja</span>
-                          )}
-                          {promo.maxDiscount && promo.maxDiscount > 0 ? (
-                            <span className="text-indigo-700 font-bold">🛑 Max Potongan {idr(promo.maxDiscount)}</span>
-                          ) : null}
-                          {promo.quota && promo.quota > 0 ? (
-                            <span className="text-slate-600 font-bold">
-                              👥 Kuota: {promo.usageCount || 0}/{promo.quota} terpakai
-                            </span>
-                          ) : null}
-                          {promo.type === 'flash-sale' && promo.promoStockQuota ? (
-                            <span className="text-orange-600 font-bold">
-                              ⚡ Stok Flash Sale: {promo.promoStockQuota} pcs
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-
-                      <td className="px-5 py-3.5">
-                        <div className="text-xs font-bold text-slate-500">
-                          <div>{new Date(promo.startDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</div>
-                          <div className="text-slate-400">s/d {new Date(promo.endDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</div>
-                        </div>
-                      </td>
-
-                      <td className="px-5 py-3.5">
-                        {expired ? (
-                          <span className="px-2 py-1 text-xs font-black bg-rose-50 text-rose-600 rounded-lg">
-                            Kedaluwarsa
-                          </span>
-                        ) : activeNow ? (
-                          <span className="px-2 py-1 text-xs font-black bg-emerald-50 text-emerald-700 rounded-lg flex items-center gap-1 w-fit">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                            Berjalan
-                          </span>
-                        ) : (
-                          <span className="px-2 py-1 text-xs font-black bg-orange-50 text-orange-600 rounded-lg">
-                            Terjadwal
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-5 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <td className="px-5 py-4">
                           <button
                             onClick={() => handleToggleActive(promo)}
-                            className={`p-2 rounded-xl transition-colors ${
-                              promo.isActive ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'
+                            className={`px-3 py-1.5 rounded-xl font-black text-xs inline-flex items-center gap-1.5 transition-all ${
+                              promo.isActive 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' 
+                                : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
                             }`}
-                            title={promo.isActive ? 'Non-aktifkan' : 'Aktifkan'}
                           >
-                            <Power size={15} />
+                            <Power size={13} />
+                            <span>{promo.isActive ? 'Aktif di Kasir' : 'Non-Aktif'}</span>
                           </button>
-                          <Link
-                            href={`/admin/promotions/edit/${promo.id}`}
-                            className="p-2 hover:bg-blue-50 text-blue-600 rounded-xl transition-colors"
-                            title="Edit Program"
-                          >
-                            <Edit size={15} />
-                          </Link>
-                          <button
-                            onClick={() => handleDelete(promo.id, promo.name)}
-                            className="p-2 hover:bg-rose-50 text-rose-600 rounded-xl transition-colors"
-                            title="Hapus"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                        </td>
+
+                        <td className="px-5 py-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Link
+                              href={`/admin/promotions/edit/${promo.id}`}
+                              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-xl text-xs font-bold transition-colors inline-flex items-center gap-1"
+                              title="Edit Aturan Tier"
+                            >
+                              <Edit size={13} />
+                              <span>Edit</span>
+                            </Link>
+                            <button
+                              onClick={() => handleDelete(promo.id, promo.name)}
+                              className="p-2 hover:bg-rose-50 text-rose-600 rounded-xl transition-colors"
+                              title="Hapus"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          ) : (
+            /* TABEL UMUM PROMOSI LAINNYA */
+            <table className="w-full text-left">
+              <thead className="bg-slate-50/70">
+                <tr>
+                  {['Program Promosi', 'Model & Target', 'Diskon', 'Pengaman Finansial (Guardrail)', 'Periode', 'Status', 'Aksi'].map((h) => (
+                    <th key={h} className="px-5 py-3.5 text-xs font-black uppercase tracking-widest text-slate-400">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {filteredPromos.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="text-center py-16 text-slate-400 font-bold text-xs">
+                      Tidak ada program promosi yang sesuai filter
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPromos.map((promo) => {
+                    const expired = isExpired(promo.endDate);
+                    const activeNow = isActiveNow(promo);
+
+                    return (
+                      <tr key={promo.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-5 py-3.5">
+                          <div className="text-xs font-black text-slate-900">{promo.name}</div>
+                          {promo.code && (
+                            <div className="mt-1">
+                              <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-black bg-purple-50 text-purple-700 border border-purple-200">
+                                KODE: {promo.code}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded-lg text-xs font-black uppercase bg-slate-100 text-slate-700">
+                              {promo.type}
+                            </span>
+                          </div>
+                          <p className="text-xs font-bold text-slate-500 mt-1 line-clamp-1">
+                            {promo.targetName || (promo.type === 'coupon' ? 'Semua Belanja' : '—')}
+                          </p>
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          <span className="text-xs font-black text-emerald-600">
+                            {promo.type === 'buy-x-get-y' ? (
+                              `Beli ${promo.buyQty || 2} Gratis ${promo.freeQty || 1}`
+                            ) : promo.discountType === 'percentage' ? (
+                              `${promo.discountValue}%`
+                            ) : (
+                              idr(promo.discountValue)
+                            )}
+                          </span>
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          <div className="flex flex-col gap-1 text-xs">
+                            {promo.minPurchase && promo.minPurchase > 0 ? (
+                              <span className="text-blue-700 font-bold">🛡️ Min. Belanja {idr(promo.minPurchase)}</span>
+                            ) : (
+                              <span className="text-slate-400">Tanpa min. belanja</span>
+                            )}
+                            {promo.maxDiscount && promo.maxDiscount > 0 ? (
+                              <span className="text-indigo-700 font-bold">🛑 Max Potongan {idr(promo.maxDiscount)}</span>
+                            ) : null}
+                            {promo.quota && promo.quota > 0 ? (
+                              <span className="text-slate-600 font-bold">
+                                👥 Kuota: {promo.usageCount || 0}/{promo.quota} terpakai
+                              </span>
+                            ) : null}
+                            {promo.type === 'flash-sale' && promo.promoStockQuota ? (
+                              <span className="text-orange-600 font-bold">
+                                ⚡ Stok Flash Sale: {promo.promoStockQuota} pcs
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          <div className="text-xs font-bold text-slate-500">
+                            <div>{new Date(promo.startDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</div>
+                            <div className="text-slate-400">s/d {new Date(promo.endDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</div>
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-3.5">
+                          {expired ? (
+                            <span className="px-2 py-1 text-xs font-black bg-rose-50 text-rose-600 rounded-lg">
+                              Kedaluwarsa
+                            </span>
+                          ) : activeNow ? (
+                            <span className="px-2 py-1 text-xs font-black bg-emerald-50 text-emerald-700 rounded-lg flex items-center gap-1 w-fit">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                              Berjalan
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 text-xs font-black bg-orange-50 text-orange-600 rounded-lg">
+                              Terjadwal
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleToggleActive(promo)}
+                              className={`p-2 rounded-xl transition-colors ${
+                                promo.isActive ? 'text-emerald-600 hover:bg-emerald-50' : 'text-slate-400 hover:bg-slate-100'
+                              }`}
+                              title={promo.isActive ? 'Non-aktifkan' : 'Aktifkan'}
+                            >
+                              <Power size={15} />
+                            </button>
+                            <Link
+                              href={`/admin/promotions/edit/${promo.id}`}
+                              className="p-2 hover:bg-blue-50 text-blue-600 rounded-xl transition-colors"
+                              title="Edit Program"
+                            >
+                              <Edit size={15} />
+                            </Link>
+                            <button
+                              onClick={() => handleDelete(promo.id, promo.name)}
+                              className="p-2 hover:bg-rose-50 text-rose-600 rounded-xl transition-colors"
+                              title="Hapus"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
