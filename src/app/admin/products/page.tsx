@@ -1506,7 +1506,7 @@ export default function AdminProducts() {
           </button>
 
           <button
-            onClick={() => { setShowInactive(true); setCurrentPage(1); setSelectedIds([]); }}
+            onClick={() => { setShowInactive(true); setCurrentPage(1); setSelectedIds([]); setSortBy('updatedAt'); }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
               showInactive 
                 ? 'bg-white text-rose-700 border border-rose-200 shadow-xs' 
@@ -1563,8 +1563,12 @@ export default function AdminProducts() {
             onChange={(e) => setSortBy(e.target.value as 'createdAt' | 'updatedAt' | 'name')}
             className="px-2.5 py-1.5 rounded-xl border border-gray-200 bg-gray-50/50 text-xs font-bold uppercase tracking-tight focus:ring-2 focus:ring-blue-100 transition-all outline-none cursor-pointer"
           >
-            <option value="createdAt">Terbaru</option>
-            <option value="updatedAt">Diupdate</option>
+            {!showInactive && <option value="createdAt">Terbaru</option>}
+            {showInactive ? (
+              <option value="updatedAt">Baru Diarsipkan</option>
+            ) : (
+              <option value="updatedAt">Diupdate</option>
+            )}
             <option value="name">Nama A-Z</option>
           </select>
 
@@ -1921,6 +1925,17 @@ export default function AdminProducts() {
                         }`}>
                           {p.isActive === false ? 'Arsip' : 'Aktif'}
                         </span>
+                        {showInactive && (p as any).archivedAt && (
+                          <span className="text-[10px] text-gray-400 font-semibold">
+                            {(() => {
+                              const diff = Date.now() - (p as any).archivedAt;
+                              const mins = Math.floor(diff / 60000);
+                              const hrs = Math.floor(diff / 3600000);
+                              const days = Math.floor(diff / 86400000);
+                              return days > 0 ? `Arsip ${days}h lalu` : hrs > 0 ? `Arsip ${hrs}j lalu` : `Arsip ${mins}m lalu`;
+                            })()}
+                          </span>
+                        )}
                         <button
                           type="button"
                           onClick={async (e) => {
@@ -2485,6 +2500,17 @@ export default function AdminProducts() {
                               }`}>
                                 {p.isActive === false ? 'Arsip' : 'Aktif'}
                               </span>
+                              {showInactive && (p as any).archivedAt && (
+                                <span className="text-[10px] text-gray-400 font-semibold">
+                                  {(() => {
+                                    const diff = Date.now() - (p as any).archivedAt;
+                                    const mins = Math.floor(diff / 60000);
+                                    const hrs = Math.floor(diff / 3600000);
+                                    const days = Math.floor(diff / 86400000);
+                                    return days > 0 ? `Arsip ${days}h lalu` : hrs > 0 ? `Arsip ${hrs}j lalu` : `Arsip ${mins}m lalu`;
+                                  })()}
+                                </span>
+                              )}
                               <button
                                 type="button"
                                 onClick={async (e) => {

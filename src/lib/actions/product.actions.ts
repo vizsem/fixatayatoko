@@ -113,7 +113,14 @@ export async function getProducts(options?: ProductQueryOptions) {
       query = query.limit(options?.limit || 1000);
     }
 
-    const sortField = options?.orderByField === 'name' ? 'name' : 'created_at';
+    let sortField = 'created_at';
+    if (options?.orderByField === 'name') {
+      sortField = 'name';
+    } else if (options?.orderByField === 'updatedAt' || (options?.orderByField as string) === 'updated_at') {
+      sortField = 'updated_at';
+    } else if (options?.orderByField === 'sku') {
+      sortField = 'sku';
+    }
     query = query.order(sortField, { ascending: options?.orderDirection === 'asc' });
 
     const { data: rows, error } = await query;
@@ -191,6 +198,7 @@ export async function getProducts(options?: ProductQueryOptions) {
         isPreOrder: Boolean(raw.isPreOrder),
         poLeadTimeDays: Number(raw.poLeadTimeDays || 3),
         poNotes: raw.poNotes || '',
+        archivedAt: raw.archivedAt ? new Date(raw.archivedAt).getTime() : (p.updated_at ? new Date(p.updated_at).getTime() : undefined),
         raw_data: raw,
       };
     });
@@ -582,6 +590,11 @@ export async function updateProductStatus(ids: string[], status: string | number
       raw.isActive = !isArchived;
       raw.Status = isArchived ? 1 : 0;
       raw.status = isArchived ? 'ARCHIVED' : 'ACTIVE';
+      if (isArchived) {
+        raw.archivedAt = now;
+      } else {
+        delete raw.archivedAt;
+      }
 
       const { error: updateError } = await supabaseAdmin
         .from('products')
