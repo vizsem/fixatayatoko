@@ -38,6 +38,7 @@ import {
   type BulkPriceTiersOptions,
   type PriceTierRule,
   bulkUpdateProductStatus,
+  bulkToggleKvi,
 } from '@/lib/actions/product.actions';
 
 export interface ProductUnitItem {
@@ -82,6 +83,16 @@ interface ProductItem {
   isParent: boolean;
   updatedAt?: string;
   priceTiers?: Array<{ minQty: number; price: number; label?: string }>;
+  isKvi: boolean;
+  shrinkagePct?: number;
+  landedCost?: {
+    inwardFreight?: number;
+    handlingFee?: number;
+    rebatePerUnit?: number;
+    focRatio?: number;
+    taxAdjustment?: number;
+    notes?: string;
+  };
 }
 
 interface AvgHppInfo {
@@ -115,6 +126,28 @@ const roundToKelipatan = (val: number, step: number = 100) => {
   return Math.ceil(val / s) * s;
 };
 
+// Deteksi otomatis KVI (Known Value Items / Sembako Cepat Putar Margin Tipis)
+const isLikelyKvi = (name: string = '', category: string = ''): boolean => {
+  const text = `${name} ${category}`.toUpperCase();
+  return (
+    text.includes('BERAS') ||
+    text.includes('MINYAK') ||
+    text.includes('GULA') ||
+    text.includes('TERIGU') ||
+    text.includes('TEPUNG') ||
+    text.includes('INDOMIE') ||
+    text.includes('MIE ') ||
+    text.includes('SEDAAP') ||
+    text.includes('TELUR') ||
+    text.includes('ROKOK') ||
+    text.includes('SUSU') ||
+    text.includes('KOPI') ||
+    text.includes('LE MINERALE') ||
+    text.includes('AQUA') ||
+    text.includes('SEMBAKO')
+  );
+};
+
 export default function PricingHPPPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -125,11 +158,15 @@ export default function PricingHPPPage() {
   const [costLogs, setCostLogs] = useState<CostPriceLog[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
 
+  // Mode Tampilan Tabel: Satuan Ecer Dasar vs Satuan Grosir (Dus/Karton/Karung)
+  const [tableViewMode, setTableViewMode] = useState<'BASE' | 'GROSIR'>('BASE');
+
   // Filter States
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState<'ACTIVE' | 'ARCHIVED' | 'ALL'>('ACTIVE');
   const [marginFilter, setMarginFilter] = useState<'ALL' | 'HEALTHY' | 'SLIM' | 'CRITICAL' | 'NEGATIVE' | 'NEEDS_REVIEW'>('ALL');
+  const [kviFilter, setKviFilter] = useState<'ALL' | 'KVI' | 'REGULAR'>('ALL');
   const [variantFilter, setVariantFilter] = useState<'ALL' | 'VARIANTS' | 'PARENTS' | 'REGULAR'>('ALL');
   const [taxFilter, setTaxFilter] = useState<'ALL' | 'TAXABLE' | 'EXEMPT' | 'PPH22'>('ALL');
   const [wholesaleFilter, setWholesaleFilter] = useState<'ALL' | 'ONLY_TIER' | 'NO_TIER'>('ALL');
@@ -143,6 +180,7 @@ export default function PricingHPPPage() {
   const [showMarginModal, setShowMarginModal] = useState(false);
   const [showPriceReviewModal, setShowPriceReviewModal] = useState(false);
   const [marginType, setMarginType] = useState<'PERCENT' | 'NOMINAL'>('PERCENT');
+  const [marginCalcMode, setMarginCalcMode] = useState<'MARGIN' | 'MARKUP' | 'NOMINAL'>('MARGIN');
   const [targetMarginValue, setTargetMarginValue] = useState<number>(20);
   const [marginUnitTarget, setMarginUnitTarget] = useState<string>('BASE_ONLY');
   const [showDivideModal, setShowDivideModal] = useState(false);
@@ -167,7 +205,7 @@ export default function PricingHPPPage() {
   const [divideValue, setDivideValue] = useState<number>(1);
   const [isResetting, startResetTransition] = useTransition();
 
-  // Quick Edit Modal
+  // Quick Edit Modal & FMCG Landed Cost Calculator
   const [editingProduct, setEditingProduct] = useState<ProductItem | null>(null);
   const [editModalCost, setEditModalCost] = useState<number>(0);
   const [editPriceEcer, setEditPriceEcer] = useState<number>(0);
@@ -178,6 +216,19 @@ export default function PricingHPPPage() {
   const [editIsHppLocked, setEditIsHppLocked] = useState<boolean>(false);
   const [editRoundingStep, setEditRoundingStep] = useState<number>(100);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // FMCG Commercial Accounting States in Quick Edit
+  const [editIsKvi, setEditIsKvi] = useState(false);
+  const [editShrinkagePct, setEditShrinkagePct] = useState(0);
+  const [showLandedCalc, setShowLandedCalc] = useState(false);
+  const [calcInvoicePrice, setCalcInvoicePrice] = useState(0);
+  const [calcTaxMode, setCalcTaxMode] = useState<'EXEMPT' | 'EXCLUDE_PPN' | 'INCLUDE_PPN'>('EXEMPT');
+  const [calcFreight, setCalcFreight] = useState(0);
+  const [calcHandling, setCalcHandling] = useState(0);
+  const [calcRebate, setCalcRebate] = useState(0);
+  const [calcFocBuy, setCalcFocBuy] = useState(0);
+  const [calcFocFree, setCalcFocFree] = useState(0);
+  const [unitMarginMode, setUnitMarginMode] = useState<Record<number, 'MARGIN' | 'MARKUP'>>({});
 
   // Form tambah satuan di Quick Edit
   const [showAddUnitRow, setShowAddUnitRow] = useState(false);
@@ -333,6 +384,10 @@ export default function PricingHPPPage() {
 
         const isItemActive = p.is_active === false || isArchivedLegacy ? false : true;
 
+        const isKvi = raw.isKvi !== undefined ? Boolean(raw.isKvi) : isLikelyKvi(p.name || raw.Nama || '', categoryStr);
+        const shrinkagePct = Number(raw.shrinkagePct || 0);
+        const landedCost = raw.landedCost;
+
         return {
           id: p.id,
           name: p.name || raw.Nama || 'Tanpa Nama',
@@ -366,6 +421,9 @@ export default function PricingHPPPage() {
           isParent: parentIdsSet.has(p.id),
           updatedAt: p.updated_at || raw.updatedAt || raw.customHppUpdatedAt || '',
           priceTiers: Array.isArray(raw.priceTiers) ? raw.priceTiers : undefined,
+          isKvi,
+          shrinkagePct,
+          landedCost,
         };
       });
 
@@ -417,10 +475,12 @@ export default function PricingHPPPage() {
     let wholesaleCount = 0;
     let activeCount = 0;
     let archivedCount = 0;
+    let kviCount = 0;
 
     products.forEach(p => {
       if (p.isActive) activeCount++;
       else archivedCount++;
+      if (p.isKvi) kviCount++;
 
       if ((p.priceTiers && p.priceTiers.length > 1) || p.priceGrosir > 0) {
         wholesaleCount++;
@@ -458,6 +518,7 @@ export default function PricingHPPPage() {
       wholesaleCount,
       activeCount,
       archivedCount,
+      kviCount,
     };
   }, [products, avgHppMap]);
 
@@ -482,12 +543,23 @@ export default function PricingHPPPage() {
           (p.units && p.units.some((u: any) => (u.barcode || '').toLowerCase().includes(q)));
         const matchCat = selectedCategory === 'ALL' || p.category === selectedCategory;
 
+        let matchKvi = true;
+        if (kviFilter === 'KVI') matchKvi = p.isKvi;
+        else if (kviFilter === 'REGULAR') matchKvi = !p.isKvi;
+
         let matchMargin = true;
-        if (marginFilter === 'HEALTHY') matchMargin = p.marginPct >= 20;
-        else if (marginFilter === 'SLIM') matchMargin = p.marginPct >= 8 && p.marginPct < 20;
-        else if (marginFilter === 'CRITICAL') matchMargin = p.marginPct > 0 && p.marginPct < 8;
-        else if (marginFilter === 'NEGATIVE') matchMargin = p.marginPct <= 0;
-        else if (marginFilter === 'NEEDS_REVIEW') matchMargin = (priceReviewByProduct.get(p.id)?.length || 0) > 0;
+        if (marginFilter === 'HEALTHY') {
+          // Bagi KVI (Sembako), margin >= 2% adalah sehat grosir/ecer volume
+          matchMargin = p.isKvi ? p.marginPct >= 2 : p.marginPct >= 20;
+        } else if (marginFilter === 'SLIM') {
+          matchMargin = p.isKvi ? (p.marginPct >= 1 && p.marginPct < 2) : (p.marginPct >= 8 && p.marginPct < 20);
+        } else if (marginFilter === 'CRITICAL') {
+          matchMargin = p.isKvi ? (p.marginPct > 0 && p.marginPct < 1) : (p.marginPct > 0 && p.marginPct < 8);
+        } else if (marginFilter === 'NEGATIVE') {
+          matchMargin = p.marginPct <= 0;
+        } else if (marginFilter === 'NEEDS_REVIEW') {
+          matchMargin = (priceReviewByProduct.get(p.id)?.length || 0) > 0;
+        }
 
         let matchTax = true;
         if (taxFilter === 'TAXABLE') matchTax = p.taxStatus === 'TAXABLE';
@@ -516,7 +588,7 @@ export default function PricingHPPPage() {
           matchNewPo = !avgHppMap[p.id] || (avgHppMap[p.id]?.poCount || 0) === 0;
         }
 
-        return matchStatus && matchSearch && matchCat && matchMargin && matchTax && matchVariant && matchNewPo;
+        return matchStatus && matchSearch && matchCat && matchMargin && matchTax && matchVariant && matchNewPo && matchKvi;
       })
       .sort((a, b) => {
         if (sortBy === 'urgent_first') {
@@ -560,7 +632,7 @@ export default function PricingHPPPage() {
         }
         return a.name.localeCompare(b.name);
       });
-  }, [products, search, selectedCategory, statusFilter, marginFilter, taxFilter, variantFilter, sortBy, avgHppMap, priceReviewByProduct, newProductFilter]);
+  }, [products, search, selectedCategory, statusFilter, marginFilter, taxFilter, variantFilter, sortBy, avgHppMap, priceReviewByProduct, newProductFilter, kviFilter]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / pageSize));
@@ -573,7 +645,7 @@ export default function PricingHPPPage() {
   const allFilteredIds = useMemo(() => filteredProducts.map(p => p.id), [filteredProducts]);
 
   // Reset to page 1 on filter/search change
-  useEffect(() => { setCurrentPage(1); }, [search, selectedCategory, statusFilter, marginFilter, taxFilter, variantFilter, newProductFilter, sortBy]);
+  useEffect(() => { setCurrentPage(1); }, [search, selectedCategory, statusFilter, marginFilter, taxFilter, variantFilter, newProductFilter, sortBy, kviFilter]);
   const allSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id));
   const someSelected = allFilteredIds.some(id => selectedIds.has(id));
 
@@ -740,7 +812,8 @@ export default function PricingHPPPage() {
           targetMarginValue,
           adminEmail,
           {
-            marginType,
+            marginType: marginCalcMode === 'NOMINAL' ? 'NOMINAL' : marginCalcMode === 'MARKUP' ? 'PERCENT_MARKUP' : 'PERCENT_MARGIN',
+            isMarkup: marginCalcMode === 'MARKUP',
             targetUnitMode: marginUnitTarget,
           }
         );
@@ -751,7 +824,11 @@ export default function PricingHPPPage() {
 
         notify.success(
           `✅ Berhasil menyesuaikan harga untuk ${result.updated} produk (${
-            marginType === 'NOMINAL' ? `+Rp ${targetMarginValue.toLocaleString('id-ID')}` : `${targetMarginValue}%`
+            marginCalcMode === 'NOMINAL'
+              ? `+Rp ${targetMarginValue.toLocaleString('id-ID')}`
+              : marginCalcMode === 'MARKUP'
+              ? `Markup +${targetMarginValue}%`
+              : `Margin ${targetMarginValue}%`
           })`
         );
 
@@ -963,6 +1040,72 @@ export default function PricingHPPPage() {
     });
   };
 
+  // Kalkulasi HPP Netto & Landed Cost Interaktif (Akuntansi FMCG)
+  const calculatedLandedCost = useMemo(() => {
+    const base = Number(calcInvoicePrice || 0);
+    let afterTax = base;
+    let taxAmount = 0;
+    if (calcTaxMode === 'EXCLUDE_PPN') {
+      taxAmount = base * 0.11;
+      afterTax = base + taxAmount;
+    } else if (calcTaxMode === 'INCLUDE_PPN') {
+      taxAmount = -(base - (base / 1.11));
+      afterTax = base / 1.11;
+    }
+
+    const freight = Number(calcFreight || 0);
+    const handling = Number(calcHandling || 0);
+    const totalAdditional = freight + handling;
+
+    const rebate = Number(calcRebate || 0);
+    
+    // FOC discount ratio: jika beli 10 gratis 1, biaya per unit = afterTax * 10 / 11
+    let focMultiplier = 1;
+    if (calcFocBuy > 0 && calcFocFree > 0) {
+      focMultiplier = calcFocBuy / (calcFocBuy + calcFocFree);
+    }
+    const afterFocAndRebate = (afterTax * focMultiplier) + totalAdditional - rebate;
+
+    // Shrinkage adjustment: jika susut 2%, HPP per kg = modal / (1 - 0.02)
+    const shrink = Number(editShrinkagePct || 0);
+    let finalNetHpp = afterFocAndRebate;
+    if (shrink > 0 && shrink < 50) {
+      finalNetHpp = afterFocAndRebate / (1 - (shrink / 100));
+    }
+    const roundedNetHpp = roundToKelipatan(Math.max(0, finalNetHpp), editRoundingStep);
+
+    return {
+      base,
+      afterTax,
+      taxAmount,
+      totalAdditional,
+      rebate,
+      focMultiplier,
+      shrinkageAmount: finalNetHpp - afterFocAndRebate,
+      finalNetHpp: roundedNetHpp,
+    };
+  }, [calcInvoicePrice, calcTaxMode, calcFreight, calcHandling, calcRebate, calcFocBuy, calcFocFree, editShrinkagePct, editRoundingStep]);
+
+  // Bulk Tag KVI Sembako
+  const handleBulkToggleKvi = async (setKvi: boolean) => {
+    if (selectedIds.size === 0) return;
+    startResetTransition(async () => {
+      try {
+        const ids = Array.from(selectedIds);
+        const res = await bulkToggleKvi(ids, setKvi);
+        if (res.success) {
+          notify.success(`${res.count} produk berhasil ${setKvi ? 'ditandai sebagai KVI Sembako' : 'dijadikan produk reguler'}`);
+          setProducts(prev => prev.map(p => ids.includes(p.id) ? { ...p, isKvi: setKvi } : p));
+          setSelectedIds(new Set());
+        } else {
+          notify.error(res.error || 'Gagal mengubah status KVI');
+        }
+      } catch (err: any) {
+        notify.error(err.message || 'Gagal mengubah status KVI');
+      }
+    });
+  };
+
   // Open Quick Edit
   const handleOpenEdit = (p: ProductItem) => {
     setEditingProduct(p);
@@ -974,6 +1117,19 @@ export default function PricingHPPPage() {
     setEditIsHppLocked(Boolean(p.isHppLocked));
     const initialRounding = Number(p.pricingStrategy?.roundingStep || 100);
     setEditRoundingStep(initialRounding > 0 ? initialRounding : 100);
+
+    // FMCG states
+    setEditIsKvi(Boolean(p.isKvi));
+    setEditShrinkagePct(Number(p.shrinkagePct || 0));
+    setShowLandedCalc(false);
+    setCalcInvoicePrice(p.costPrice);
+    setCalcTaxMode(p.taxStatus === 'TAXABLE' ? 'EXCLUDE_PPN' : 'EXEMPT');
+    setCalcFreight(p.landedCost?.inwardFreight || 0);
+    setCalcHandling(p.landedCost?.handlingFee || 0);
+    setCalcRebate(p.landedCost?.rebatePerUnit || 0);
+    setCalcFocBuy(0);
+    setCalcFocFree(0);
+    setUnitMarginMode({});
 
     // Clone units list atau fallback ke base unit jika kosong
     const initialUnits: ProductUnitItem[] = p.units && p.units.length > 0
@@ -1031,6 +1187,14 @@ export default function PricingHPPPage() {
         units: syncedUnits,
         isHppLocked: editIsHppLocked,
         roundingStep: editRoundingStep,
+        isKvi: editIsKvi,
+        shrinkagePct: editShrinkagePct,
+        landedCost: {
+          inwardFreight: calcFreight,
+          handlingFee: calcHandling,
+          rebatePerUnit: calcRebate,
+          notes: showLandedCalc ? 'Kalkulator Landed Cost FMCG' : undefined,
+        },
       });
 
       if (!result.success) throw new Error(result.error || 'Gagal menyimpan');
@@ -1177,7 +1341,7 @@ export default function PricingHPPPage() {
             </div>
             <p className="text-2xl md:text-3xl font-black text-slate-900">{kpis.activeCount}</p>
             <p className="text-[10px] md:text-xs font-bold text-slate-400">
-              <span className="text-purple-600 font-extrabold">{kpis.wholesaleCount} Grosir Tier</span> · <span className="text-slate-500">{kpis.archivedCount} Arsip</span>
+              <span className="text-amber-600 font-extrabold">{kpis.kviCount} KVI Sembako</span> · <span className="text-purple-600 font-extrabold">{kpis.wholesaleCount} Grosir</span>
             </p>
           </div>
 
@@ -1353,6 +1517,19 @@ export default function PricingHPPPage() {
                   <option value="PPH22">🏗️ PPh 22 ({kpis.pph22Count})</option>
                 </select>
 
+                <select
+                  value={kviFilter}
+                  onChange={e => {
+                    setKviFilter(e.target.value as any);
+                    setSelectedIds(new Set());
+                  }}
+                  className="bg-amber-50/80 border border-amber-200 rounded-2xl px-3 py-2 text-xs font-bold text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500 w-full md:w-auto"
+                >
+                  <option value="ALL">Semua Produk ({products.length})</option>
+                  <option value="KVI">🌾 KVI · Sembako Pokok ({kpis.kviCount})</option>
+                  <option value="REGULAR">🏷️ Produk Reguler ({products.length - kpis.kviCount})</option>
+                </select>
+
                  <select
                   value={newProductFilter}
                   onChange={e => { setNewProductFilter(e.target.value as any); setSelectedIds(new Set()); }}
@@ -1379,6 +1556,46 @@ export default function PricingHPPPage() {
                   <option value="stock_desc">Urut: Stok Terbanyak</option>
                   <option value="avg_diff">Urut: Selisih AVG Terbesar</option>
                 </select>
+              </div>
+
+              {/* Mode Tampilan Analisis: Satuan Dasar (Ecer) vs Satuan Grosir (Dus/Karton) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl w-fit">
+                  <button
+                    type="button"
+                    onClick={() => setTableViewMode('BASE')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+                      tableViewMode === 'BASE'
+                        ? 'bg-white text-blue-700 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Package size={13} />
+                    <span>Satuan Dasar / Ecer (Pcs/Kg)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTableViewMode('GROSIR')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+                      tableViewMode === 'GROSIR'
+                        ? 'bg-purple-600 text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    <Layers size={13} />
+                    <span>Satuan Grosir / Partai (Dus/Karung/Bal)</span>
+                  </button>
+                </div>
+                <div className="text-[11px] font-bold text-slate-400">
+                  {tableViewMode === 'GROSIR' ? (
+                    <span className="text-purple-700 font-extrabold flex items-center gap-1">
+                      <ShieldCheck size={13} className="text-purple-600" />
+                      Mode Analisis Partai: Pantau HPP Dus & Proteksi Safety Floor Margin
+                    </span>
+                  ) : (
+                    <span>Menampilkan HPP per satuan terkecil dasar (Pcs/Kg)</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1473,6 +1690,23 @@ export default function PricingHPPPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => handleBulkToggleKvi(true)}
+                    className="px-3 py-2 bg-amber-500/40 hover:bg-amber-500/60 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border border-amber-300/40"
+                    title="Tandai produk terpilih sebagai KVI Sembako Pokok (Margin tipis volume tinggi wajar)"
+                  >
+                    <Sparkles size={12} className="text-amber-200" />
+                    Tandai KVI ({selectedCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBulkToggleKvi(false)}
+                    className="px-2.5 py-2 bg-white/10 hover:bg-white/20 text-white/80 rounded-xl text-xs font-bold transition-all flex items-center gap-1 border border-white/10"
+                    title="Hapus tanda KVI menjadi produk reguler"
+                  >
+                    Bukan KVI
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setShowTierModal(true)}
                     className="px-3 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border border-purple-500/50 shadow-sm"
                     title="Hitung & atur tingkatan (tier) harga grosir bertingkat otomatis untuk produk yang dipilih"
@@ -1535,26 +1769,38 @@ export default function PricingHPPPage() {
                             )}
                           </button>
                         </th>
-                        <th className="py-4 px-4 min-w-[200px] max-w-[280px]">Produk & SKU</th>
-                        <th className="py-4 px-4 text-center min-w-[160px]">Stok & Satuan</th>
-                        <th className="py-4 px-4 text-right min-w-[120px]">HPP Aktif</th>
+                        <th className="py-4 px-4 min-w-[200px] max-w-[280px]">Produk &amp; SKU</th>
+                        <th className="py-4 px-4 text-center min-w-[160px]">
+                          {tableViewMode === 'GROSIR' ? 'Stok (Ekuivalen Dus)' : 'Stok & Satuan'}
+                        </th>
+                        <th className="py-4 px-4 text-right min-w-[120px]">
+                          {tableViewMode === 'GROSIR' ? 'HPP Dus / Partai' : 'HPP Aktif'}
+                        </th>
                         <th className="py-4 px-4 text-right min-w-[110px]">
                           <div className="flex items-center justify-end gap-1">
                             <Sparkles size={12} className="text-amber-500" />
-                            AVG HPP (PO)
+                            {tableViewMode === 'GROSIR' ? 'AVG PO Dus' : 'AVG HPP (PO)'}
                           </div>
                         </th>
-                        <th className="py-4 px-4 text-right min-w-[110px]">Harga Jual</th>
-                        <th className="py-4 px-4 text-right min-w-[140px]">Margin (Rp / %)</th>
-                        <th className="py-4 px-4 text-right min-w-[100px]">Grosir</th>
+                        <th className="py-4 px-4 text-right min-w-[110px]">
+                          {tableViewMode === 'GROSIR' ? 'Harga Jual Dus' : 'Harga Jual'}
+                        </th>
+                        <th className="py-4 px-4 text-right min-w-[140px]">
+                          {tableViewMode === 'GROSIR' ? 'Margin Dus (Rp / %)' : 'Margin (Rp / %)'}
+                        </th>
+                        <th className="py-4 px-4 text-center min-w-[110px]">
+                          {tableViewMode === 'GROSIR' ? 'Safety Floor' : 'Grosir'}
+                        </th>
                         <th className="py-4 px-5 text-center min-w-[90px]">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                       {paginatedProducts.map(p => {
-                        const isHealthy = p.marginPct >= 20;
-                        const isSlim = p.marginPct >= 8 && p.marginPct < 20;
+                        const isHealthy = p.isKvi ? p.marginPct >= 2 : p.marginPct >= 20;
+                        const isSlim = p.isKvi ? (p.marginPct >= 1 && p.marginPct < 2) : (p.marginPct >= 8 && p.marginPct < 20);
                         const isLoss = p.marginPct <= 0;
+                        const isKviComfort = p.isKvi && p.marginPct >= 1.5 && p.marginPct < 8;
+
                         const avg = avgHppMap[p.id];
                         const avgDiff = avg ? avg.avgCost - p.costPrice : null;
                         const hasDrift = avg && avg.avgCost > 0 && Math.abs(avgDiff!) > 100;
@@ -1568,6 +1814,23 @@ export default function PricingHPPPage() {
                             unit.contains > 1
                           )
                           .sort((a, b) => a.contains - b.contains);
+
+                        // Perhitungan Analisis Mode Satuan Grosir / Kartonan
+                        const bulkUnit = p.units
+                          .filter((unit) => unit.code !== p.unit && Number.isFinite(unit.contains) && unit.contains > 1)
+                          .sort((a, b) => b.contains - a.contains)[0];
+
+                        const bulkContains = bulkUnit ? bulkUnit.contains : 1;
+                        const bulkCode = bulkUnit ? bulkUnit.code : p.unit;
+                        const bulkCost = p.costPrice * bulkContains;
+                        const bulkPrice = bulkUnit && bulkUnit.price ? bulkUnit.price : (p.priceEcer * bulkContains);
+                        const bulkMarginRp = bulkPrice - bulkCost;
+                        const bulkMarginPct = bulkPrice > 0 ? (bulkMarginRp / bulkPrice) * 100 : 0;
+                        const bulkStock = bulkUnit ? Math.floor(p.stock / bulkContains) : p.stock;
+                        const bulkStockSisa = bulkUnit ? (p.stock % bulkContains) : 0;
+                        const bulkAvgCost = avg && avg.avgCost > 0 ? avg.avgCost * bulkContains : 0;
+                        const isBulkLoss = bulkMarginRp <= 0;
+                        const isBulkSlim = bulkMarginPct > 0 && bulkMarginPct < (p.isKvi ? 1.5 : 5);
 
                         return (
                           <tr
@@ -1597,6 +1860,22 @@ export default function PricingHPPPage() {
                                   >
                                     {formatProductName(p.name)}
                                   </Link>
+                                  {p.isKvi && (
+                                    <span 
+                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300 shrink-0"
+                                      title="Known Value Item (Sembako Pokok): Produk tolak ukur pasar ber-margin tipis wajar"
+                                    >
+                                      🌾 KVI
+                                    </span>
+                                  )}
+                                  {p.shrinkagePct && p.shrinkagePct > 0 ? (
+                                    <span 
+                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-orange-50 text-orange-700 border border-orange-200 shrink-0"
+                                      title={`Cadangan Susut Timbang / Ceceran: ${p.shrinkagePct}%`}
+                                    >
+                                      ⚖️ {p.shrinkagePct}%
+                                    </span>
+                                  ) : null}
                                   {p.isVariant && (
                                     <span 
                                       className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-purple-100 text-purple-700 shrink-0"
@@ -1683,75 +1962,137 @@ export default function PricingHPPPage() {
 
                             {/* Stok & Semua Satuan Produk yang Diset */}
                             <td className="py-2 px-4 text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <span className="font-black text-slate-800 text-sm">{p.stock}</span>
-                                <span className="text-[10px] text-slate-400 font-bold uppercase">{p.unit}</span>
-                              </div>
-
-                              {/* Daftar semua satuan yang telah diset */}
-                              <div className="flex flex-wrap gap-1 mt-0.5 justify-center">
-                                {p.units.map(u => {
-                                  const isBase = u.code === p.unit;
-                                  const review = reviewByUnit.get(u.code);
-                                  return (
-                                    <span
-                                      key={u.code}
-                                      className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-black ${
-                                        review
-                                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                          : isBase
-                                          ? 'bg-slate-100 text-slate-700 border border-slate-200'
-                                          : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                      }`}
-                                      title={review
-                                        ? `${u.code}: harga Rp${review.currentPrice.toLocaleString('id-ID')} di bawah target Rp${review.recommendedPrice.toLocaleString('id-ID')}`
-                                        : `${u.code} (isi ${u.contains} ${p.unit}) · Harga Jual: Rp ${(u.price || 0).toLocaleString('id-ID')}`}
-                                    >
-                                      <span>{u.code}{u.contains > 1 ? `×${u.contains}` : ''}</span>
-                                      <span className="text-slate-300">|</span>
-                                      <span className="text-blue-700 font-black">
-                                        Rp{(u.price || 0).toLocaleString('id-ID')}
-                                      </span>
+                              {tableViewMode === 'GROSIR' ? (
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className="font-black text-slate-800 text-sm">{bulkStock.toLocaleString('id-ID')}</span>
+                                    <span className="text-[10px] text-slate-600 font-bold uppercase">{bulkCode}</span>
+                                  </div>
+                                  {bulkUnit && bulkStockSisa > 0 && (
+                                    <span className="text-[9px] text-slate-400 font-medium block">
+                                      + {bulkStockSisa} {p.unit}
                                     </span>
-                                  );
-                                })}
-                              </div>
+                                  )}
+                                  {bulkUnit && (
+                                    <span className="text-[9px] font-bold text-indigo-600 block">
+                                      (1 {bulkCode} = {bulkContains} {p.unit})
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="flex items-center justify-center gap-1">
+                                    <span className="font-black text-slate-800 text-sm">{p.stock}</span>
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase">{p.unit}</span>
+                                  </div>
+
+                                  {/* Daftar semua satuan yang telah diset */}
+                                  <div className="flex flex-wrap gap-1 mt-0.5 justify-center">
+                                    {p.units.map(u => {
+                                      const isBase = u.code === p.unit;
+                                      const review = reviewByUnit.get(u.code);
+                                      return (
+                                        <span
+                                          key={u.code}
+                                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] font-black ${
+                                            review
+                                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                              : isBase
+                                              ? 'bg-slate-100 text-slate-700 border border-slate-200'
+                                              : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                          }`}
+                                          title={review
+                                            ? `${u.code}: harga Rp${review.currentPrice.toLocaleString('id-ID')} di bawah target Rp${review.recommendedPrice.toLocaleString('id-ID')}`
+                                            : `${u.code} (isi ${u.contains} ${p.unit}) · Harga Jual: Rp ${(u.price || 0).toLocaleString('id-ID')}`}
+                                        >
+                                          <span>{u.code}{u.contains > 1 ? `×${u.contains}` : ''}</span>
+                                          <span className="text-slate-300">|</span>
+                                          <span className="text-blue-700 font-black">
+                                            Rp{(u.price || 0).toLocaleString('id-ID')}
+                                          </span>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                </>
+                              )}
                             </td>
 
                             {/* Modal HPP Aktif & Lock Status */}
                             <td className="py-2 px-4 text-right">
-                              <div className="flex items-center justify-end gap-1.5">
-                                {p.isHppLocked && (
-                                  <span
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-200 shrink-0"
-                                    title="HPP diset manual & terkunci. Tidak akan hilang saat Restart AVG"
-                                  >
-                                    <Lock size={9} />
-                                    Terkunci
-                                  </span>
-                                )}
-                                <div className="flex items-baseline gap-1">
-                                  <span className="font-black text-slate-900 text-sm">
-                                    Rp {p.costPrice.toLocaleString('id-ID')}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400 font-bold">/{p.unit}</span>
+                              {tableViewMode === 'GROSIR' ? (
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {p.isHppLocked && (
+                                      <span
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-200 shrink-0"
+                                        title="HPP diset manual & terkunci"
+                                      >
+                                        <Lock size={9} />
+                                      </span>
+                                    )}
+                                    <div className="flex items-baseline gap-1">
+                                      <span className="font-black text-slate-900 text-sm">
+                                        Rp {bulkCost.toLocaleString('id-ID')}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400 font-bold">/{bulkCode}</span>
+                                    </div>
+                                  </div>
+                                  {bulkUnit && (
+                                    <p className="text-[9px] text-slate-400 font-medium">
+                                      @Rp {p.costPrice.toLocaleString('id-ID')}/{p.unit}
+                                    </p>
+                                  )}
                                 </div>
-                              </div>
+                              ) : (
+                                <>
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    {p.isHppLocked && (
+                                      <span
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-200 shrink-0"
+                                        title="HPP diset manual & terkunci. Tidak akan hilang saat Restart AVG"
+                                      >
+                                        <Lock size={9} />
+                                        Terkunci
+                                      </span>
+                                    )}
+                                    <div className="flex items-baseline gap-1">
+                                      <span className="font-black text-slate-900 text-sm">
+                                        Rp {p.costPrice.toLocaleString('id-ID')}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400 font-bold">/{p.unit}</span>
+                                    </div>
+                                  </div>
 
-                              {otherUnitCosts.length > 0 && (
-                                <div className="flex flex-wrap gap-0.5 mt-0.5 justify-end" title={otherUnitCosts.map(u => `${u.code}: Rp${(p.costPrice * u.contains).toLocaleString('id-ID')}`).join(' | ')}>
-                                  {otherUnitCosts.map((unit) => (
-                                    <span key={unit.code} className="text-[9px] font-black text-slate-400 bg-slate-50 border border-slate-200 px-1 py-0.5 rounded">
-                                      {unit.code}·{Math.round(p.costPrice * unit.contains / 1000)}k
-                                    </span>
-                                  ))}
-                                </div>
+                                  {otherUnitCosts.length > 0 && (
+                                    <div className="flex flex-wrap gap-0.5 mt-0.5 justify-end" title={otherUnitCosts.map(u => `${u.code}: Rp${(p.costPrice * u.contains).toLocaleString('id-ID')}`).join(' | ')}>
+                                      {otherUnitCosts.map((unit) => (
+                                        <span key={unit.code} className="text-[9px] font-black text-slate-400 bg-slate-50 border border-slate-200 px-1 py-0.5 rounded">
+                                          {unit.code}·{Math.round(p.costPrice * unit.contains / 1000)}k
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
                               )}
                             </td>
 
                             {/* AVG HPP dari PO */}
                             <td className="py-2 px-4 text-right">
-                              {avgLoading ? (
+                              {tableViewMode === 'GROSIR' ? (
+                                avg && bulkAvgCost > 0 ? (
+                                  <div>
+                                    <p className={`font-black ${hasDrift ? 'text-amber-700' : 'text-emerald-700'}`}>
+                                      Rp {bulkAvgCost.toLocaleString('id-ID')}
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 font-bold">
+                                      /{bulkCode} · {avg.poCount} PO
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300 font-bold text-[11px] block">Belum ada PO</span>
+                                )
+                              ) : avgLoading ? (
                                 <div className="h-4 w-20 bg-slate-100 rounded animate-pulse ml-auto" />
                               ) : avg && avg.avgCost > 0 ? (
                                 <div>
@@ -1797,62 +2138,118 @@ export default function PricingHPPPage() {
                               )}
                             </td>
 
-                            {/* Harga Jual Ecer */}
+                            {/* Harga Jual */}
                             <td className="py-2 px-4 text-right font-black text-blue-700">
-                              <p className="text-sm">Rp {p.priceEcer.toLocaleString('id-ID')}</p>
-                              <p className="text-[10px] text-slate-400 font-bold">/{p.unit}</p>
+                              {tableViewMode === 'GROSIR' ? (
+                                <div>
+                                  <p className="text-sm">Rp {bulkPrice.toLocaleString('id-ID')}</p>
+                                  <p className="text-[10px] text-slate-400 font-bold">/{bulkCode}</p>
+                                  {bulkUnit && (
+                                    <p className="text-[9px] text-slate-400 font-medium">
+                                      @Rp {Math.round(bulkPrice / bulkContains).toLocaleString('id-ID')}/{p.unit}
+                                    </p>
+                                  )}
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="text-sm">Rp {p.priceEcer.toLocaleString('id-ID')}</p>
+                                  <p className="text-[10px] text-slate-400 font-bold">/{p.unit}</p>
+                                </>
+                              )}
                             </td>
 
                             {/* Margin Keuntungan */}
                             <td className="py-2 px-4 text-right">
-                              <div className="flex flex-col items-end">
-                                <div className="flex items-baseline gap-1">
-                                  <span className={`font-black ${isLoss ? 'text-rose-600' : isSlim ? 'text-amber-600' : 'text-emerald-600'}`}>
-                                    {p.marginRp >= 0 ? '+' : ''}Rp {p.marginRp.toLocaleString('id-ID')}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400 font-bold">/{p.unit}</span>
-                                </div>
-                                <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                  isLoss ? 'bg-rose-50 text-rose-600' : isSlim ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
-                                }`}>
-                                  {p.marginPct.toFixed(1)}%
-                                </span>
-                                {p.taxStatus === 'TAXABLE' && p.marginPct < 11 && p.marginPct > 0 && (
-                                  <span
-                                    className="inline-flex items-center gap-0.5 text-[8px] font-bold text-rose-700 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 mt-1"
-                                    title="Peringatan Boncos: Produk Wajib Pajak ini memiliki margin kotor di bawah 11% (terancam tergerus PPN)!"
-                                  >
-                                    <AlertTriangle size={8} /> Margin &lt; PPN 11%
-                                  </span>
-                                )}
-
-                                {/* Margin Satuan Lainnya - compact chips */}
-                                {otherUnitCosts.length > 0 && (
-                                  <div className="flex flex-wrap gap-0.5 mt-0.5 justify-end">
-                                    {otherUnitCosts.map((unit) => {
-                                      const unitCost = p.costPrice * (unit.contains || 1);
-                                      const unitPrice = Number(unit.price || 0);
-                                      const unitMarginPct = unitPrice > 0 ? ((unitPrice - unitCost) / unitPrice) * 100 : 0;
-                                      const isUnitLoss = unitMarginPct <= 0;
-                                      const isUnitSlim = unitMarginPct > 0 && unitMarginPct < 8;
-                                      return (
-                                        <span
-                                          key={unit.code}
-                                          className={`text-[9px] font-black px-1 py-0.5 rounded ${isUnitLoss ? 'bg-rose-50 text-rose-600' : isUnitSlim ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}
-                                          title={`${unit.code}: margin ${unitMarginPct.toFixed(1)}% | Harga Rp${unitPrice.toLocaleString('id-ID')} - Modal Rp${unitCost.toLocaleString('id-ID')}`}
-                                        >
-                                          {unit.code} {unitMarginPct.toFixed(0)}%
-                                        </span>
-                                      );
-                                    })}
+                              {tableViewMode === 'GROSIR' ? (
+                                <div className="flex flex-col items-end">
+                                  <div className="flex items-baseline gap-1">
+                                    <span className={`font-black ${isBulkLoss ? 'text-rose-600' : isBulkSlim ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                      {bulkMarginRp >= 0 ? '+' : ''}Rp {bulkMarginRp.toLocaleString('id-ID')}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-bold">/{bulkCode}</span>
                                   </div>
-                                )}
-                              </div>
+                                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                    isBulkLoss ? 'bg-rose-50 text-rose-600' : isBulkSlim ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
+                                  }`}>
+                                    {bulkMarginPct.toFixed(1)}%
+                                  </span>
+                                  {p.isKvi && bulkMarginPct >= 1 && (
+                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-800 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 mt-0.5">
+                                      🌾 Margin Sembako
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-end">
+                                  <div className="flex items-baseline gap-1">
+                                    <span className={`font-black ${isLoss ? 'text-rose-600' : isSlim ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                      {p.marginRp >= 0 ? '+' : ''}Rp {p.marginRp.toLocaleString('id-ID')}
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 font-bold">/{p.unit}</span>
+                                  </div>
+                                  <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                    isLoss ? 'bg-rose-50 text-rose-600' : isSlim ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
+                                  }`}>
+                                    {p.marginPct.toFixed(1)}%
+                                  </span>
+                                  {isKviComfort && (
+                                    <span className="inline-flex items-center gap-0.5 text-[8px] font-bold text-amber-800 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 mt-0.5">
+                                      🌾 Sehat (Vol)
+                                    </span>
+                                  )}
+                                  {p.taxStatus === 'TAXABLE' && p.marginPct < 11 && p.marginPct > 0 && (
+                                    <span
+                                      className="inline-flex items-center gap-0.5 text-[8px] font-bold text-rose-700 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 mt-1"
+                                      title="Peringatan Boncos: Produk Wajib Pajak ini memiliki margin kotor di bawah 11% (terancam tergerus PPN)!"
+                                    >
+                                      <AlertTriangle size={8} /> Margin &lt; PPN 11%
+                                    </span>
+                                  )}
+
+                                  {/* Margin Satuan Lainnya - compact chips */}
+                                  {otherUnitCosts.length > 0 && (
+                                    <div className="flex flex-wrap gap-0.5 mt-0.5 justify-end">
+                                      {otherUnitCosts.map((unit) => {
+                                        const unitCost = p.costPrice * (unit.contains || 1);
+                                        const unitPrice = Number(unit.price || 0);
+                                        const unitMarginPct = unitPrice > 0 ? ((unitPrice - unitCost) / unitPrice) * 100 : 0;
+                                        const isUnitLoss = unitMarginPct <= 0;
+                                        const isUnitSlim = unitMarginPct > 0 && unitMarginPct < 8;
+                                        return (
+                                          <span
+                                            key={unit.code}
+                                            className={`text-[9px] font-black px-1 py-0.5 rounded ${isUnitLoss ? 'bg-rose-50 text-rose-600' : isUnitSlim ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}
+                                            title={`${unit.code}: margin ${unitMarginPct.toFixed(1)}% | Harga Rp${unitPrice.toLocaleString('id-ID')} - Modal Rp${unitCost.toLocaleString('id-ID')}`}
+                                          >
+                                            {unit.code} {unitMarginPct.toFixed(0)}%
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </td>
 
-                            {/* Harga Grosir */}
+                            {/* Harga Grosir / Safety Floor */}
                             <td className="py-2 px-4 text-right">
-                              {p.priceTiers && p.priceTiers.length > 1 ? (
+                              {tableViewMode === 'GROSIR' ? (
+                                <div className="flex justify-end">
+                                  {isBulkLoss ? (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                      <AlertTriangle size={9} /> Di Bawah Modal
+                                    </span>
+                                  ) : bulkMarginPct < 1 ? (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                      ⚠️ Tipis (&lt;1%)
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                      🛡️ Floor Aman
+                                    </span>
+                                  )}
+                                </div>
+                              ) : p.priceTiers && p.priceTiers.length > 1 ? (
                                 <div className="flex flex-col items-end gap-0.5" title={p.priceTiers.map(t => `${t.label || `Min ${t.minQty}`}: Rp${t.price.toLocaleString('id-ID')}`).join('\n')}>
                                   {p.priceTiers.filter(t => t.minQty > 1).map((t, idx) => (
                                     <span key={idx} className="inline-flex items-center gap-1 text-[9px] font-black text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
@@ -2182,6 +2579,223 @@ export default function PricingHPPPage() {
                   </span>
                 </div>
               </label>
+
+              {/* Parameter Akuntansi Grosir FMCG: KVI & Susut */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <label className="flex items-center gap-2 p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl cursor-pointer hover:bg-amber-100/60 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={editIsKvi}
+                    onChange={e => setEditIsKvi(e.target.checked)}
+                    className="w-4 h-4 text-amber-600 rounded border-amber-300 focus:ring-amber-500"
+                  />
+                  <div>
+                    <span className="text-xs font-black text-amber-900 flex items-center gap-1">
+                      <Sparkles size={11} className="text-amber-600" />
+                      KVI / Sembako Pokok
+                    </span>
+                    <span className="text-[10px] text-amber-700 font-bold block">
+                      Target margin tipis (1.5-7%) dianggap wajar karena volume tinggi.
+                    </span>
+                  </div>
+                </label>
+
+                <div className="p-2.5 bg-slate-100/70 border border-slate-200 rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-700">Susut / Ceceran (%)</span>
+                    <span className="text-[10px] font-bold text-slate-400">Curah/Timbang</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max="30"
+                      step="0.5"
+                      placeholder="0"
+                      value={editShrinkagePct || ''}
+                      onChange={e => setEditShrinkagePct(Number(e.target.value))}
+                      className="w-full px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-800"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
+                  </div>
+                  <span className="text-[9px] text-slate-500 font-medium block">
+                    Beras/Telur susut timbangan (HPP disesuaikan naik otomatis).
+                  </span>
+                </div>
+              </div>
+
+              {/* Toggle Kalkulator Landed Cost */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowLandedCalc(!showLandedCalc)}
+                  className="w-full py-2 px-3 bg-gradient-to-r from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 text-blue-900 rounded-xl text-xs font-black flex items-center justify-between transition-all"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Calculator size={14} className="text-blue-600" />
+                    Kalkulator Landed Cost, Pajak PPN, Rebate &amp; FOC
+                  </span>
+                  <span className="text-[10px] font-bold text-blue-600">
+                    {showLandedCalc ? 'Tutup ▲' : 'Buka Kalkulator ▼'}
+                  </span>
+                </button>
+
+                {showLandedCalc && (
+                  <div className="mt-2.5 p-3.5 bg-blue-50/50 border border-blue-200 rounded-2xl space-y-3 animate-in fade-in">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 block mb-0.5">
+                          Harga Faktur Beli (Rp)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={calcInvoicePrice}
+                          onChange={e => setCalcInvoicePrice(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 block mb-0.5">
+                          Perlakuan Pajak PPN
+                        </label>
+                        <select
+                          value={calcTaxMode}
+                          onChange={e => setCalcTaxMode(e.target.value as any)}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
+                        >
+                          <option value="EXEMPT">Bebas PPN (0% Non-BKP Sembako)</option>
+                          <option value="EXCLUDE_PPN">Faktur Exclude PPN (+11% Masuk HPP)</option>
+                          <option value="INCLUDE_PPN">Faktur Include PPN (Ekstrak DPP /1.11)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 block mb-0.5">
+                          Ongkir Truk / Ekspedisi (+Rp/Unit)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={calcFreight || ''}
+                          onChange={e => setCalcFreight(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 block mb-0.5">
+                          Bongkar Muat Kuli (+Rp/Unit)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={calcHandling || ''}
+                          onChange={e => setCalcHandling(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 block mb-0.5">
+                          Rebate / Cashback Off-Invoice (-Rp/Unit)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={calcRebate || ''}
+                          onChange={e => setCalcRebate(Number(e.target.value))}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-emerald-700"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black uppercase text-slate-600 block mb-0.5">
+                          Skema Bonus FOC (Beli X Gratis Y)
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Beli (10)"
+                            value={calcFocBuy || ''}
+                            onChange={e => setCalcFocBuy(Number(e.target.value))}
+                            className="w-1/2 px-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold"
+                          />
+                          <span className="text-[10px] font-bold text-slate-400">+</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="Gratis (1)"
+                            value={calcFocFree || ''}
+                            onChange={e => setCalcFocFree(Number(e.target.value))}
+                            className="w-1/2 px-2 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-indigo-700"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ringkasan Kalkulasi Landed Cost */}
+                    <div className="p-3 bg-white rounded-xl border border-blue-200 shadow-2xs space-y-1 text-xs">
+                      <div className="flex justify-between text-slate-500">
+                        <span>Faktur Dasar:</span>
+                        <span>Rp {calculatedLandedCost.base.toLocaleString('id-ID')}</span>
+                      </div>
+                      {calculatedLandedCost.taxAmount !== 0 && (
+                        <div className="flex justify-between text-indigo-600">
+                          <span>Penyesuaian Pajak ({calcTaxMode === 'EXCLUDE_PPN' ? '+PPN 11%' : '-PPN Include'}):</span>
+                          <span>{calculatedLandedCost.taxAmount > 0 ? '+' : ''}Rp {Math.round(calculatedLandedCost.taxAmount).toLocaleString('id-ID')}</span>
+                        </div>
+                      )}
+                      {calculatedLandedCost.totalAdditional > 0 && (
+                        <div className="flex justify-between text-slate-600">
+                          <span>Ongkir &amp; Kuli:</span>
+                          <span>+Rp {calculatedLandedCost.totalAdditional.toLocaleString('id-ID')}</span>
+                        </div>
+                      )}
+                      {calculatedLandedCost.rebate > 0 && (
+                        <div className="flex justify-between text-emerald-600 font-bold">
+                          <span>Rebate Off-Invoice:</span>
+                          <span>-Rp {calculatedLandedCost.rebate.toLocaleString('id-ID')}</span>
+                        </div>
+                      )}
+                      {calculatedLandedCost.focMultiplier < 1 && (
+                        <div className="flex justify-between text-indigo-600 font-bold">
+                          <span>Efek Bonus FOC:</span>
+                          <span>Faktor {(calculatedLandedCost.focMultiplier * 100).toFixed(1)}%</span>
+                        </div>
+                      )}
+                      {calculatedLandedCost.shrinkageAmount > 0 && (
+                        <div className="flex justify-between text-amber-700 font-bold">
+                          <span>Dampak Susut ({editShrinkagePct}%):</span>
+                          <span>+Rp {Math.round(calculatedLandedCost.shrinkageAmount).toLocaleString('id-ID')}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between pt-1 border-t border-slate-100 font-black text-slate-900 text-sm">
+                        <span>HPP Netto Riil:</span>
+                        <span className="text-blue-700">Rp {calculatedLandedCost.finalNetHpp.toLocaleString('id-ID')}</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditModalCost(calculatedLandedCost.finalNetHpp);
+                          notify.success(`HPP diset ke Rp ${calculatedLandedCost.finalNetHpp.toLocaleString('id-ID')}`);
+                        }}
+                        className="w-full mt-2 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                      >
+                        <CheckCircle2 size={13} />
+                        Gunakan Rp {calculatedLandedCost.finalNetHpp.toLocaleString('id-ID')} Sebagai Modal Dasar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* SECTION DAFTAR SATUAN & HARGA MULTI-SATUAN */}
@@ -2563,70 +3177,76 @@ export default function PricingHPPPage() {
                               20%
                             </button>
 
-                            {/* Input Presentase Manual per Satuan */}
-                            <div className="flex items-center gap-1 bg-slate-100 border border-slate-300 rounded-lg px-1.5 py-0.5" title={`Ketik persentase (%) keuntungan manual (Bulat Rp ${editRoundingStep}), lalu tekan Enter`}>
-                              <span className="text-[9px] font-black text-slate-500">%</span>
-                              <input
-                                type="number"
-                                min="-90"
-                                max="1000"
-                                step="1"
-                                placeholder="±%"
-                                defaultValue=""
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    const val = Number((e.target as HTMLInputElement).value);
-                                    if (!isNaN(val) && val > -100 && val < 100) {
-                                      // Rumus Margin %: Harga = Modal / (1 - (val / 100))
-                                      const targetPrice = roundToKelipatan(unitCost / (1 - (val / 100)), editRoundingStep);
-                                      if (isBase) setEditPriceEcer(targetPrice);
-                                      setEditUnits(prev => {
-                                        const next = [...prev];
-                                        next[idx] = { ...next[idx], price: targetPrice };
-                                        return next;
-                                      });
-                                      notify.success(`Margin ${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')} (Bulat Rp ${editRoundingStep})`);
-                                    } else if (val >= 100) {
-                                      // Markup % jika >= 100: Harga = Modal * (1 + val/100)
-                                      const targetPrice = roundToKelipatan(unitCost * (1 + (val / 100)), editRoundingStep);
-                                      if (isBase) setEditPriceEcer(targetPrice);
-                                      setEditUnits(prev => {
-                                        const next = [...prev];
-                                        next[idx] = { ...next[idx], price: targetPrice };
-                                        return next;
-                                      });
-                                      notify.success(`Markup +${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')} (Bulat Rp ${editRoundingStep})`);
-                                    }
+                            {/* Toggle & Input Margin vs Markup per Satuan */}
+                            {(() => {
+                              const currentMode = unitMarginMode[idx] || 'MARGIN';
+                              const applyValue = (val: number) => {
+                                if (isNaN(val)) return;
+                                if (currentMode === 'MARGIN') {
+                                  if (val >= 100) {
+                                    notify.error('Margin dari harga jual tidak boleh ≥ 100%');
+                                    return;
                                   }
-                                }}
-                                onBlur={e => {
-                                  const val = Number(e.target.value);
-                                  if (e.target.value !== '' && !isNaN(val)) {
-                                    if (val > -100 && val < 100) {
-                                      const targetPrice = roundToKelipatan(unitCost / (1 - (val / 100)), editRoundingStep);
-                                      if (isBase) setEditPriceEcer(targetPrice);
-                                      setEditUnits(prev => {
-                                        const next = [...prev];
-                                        next[idx] = { ...next[idx], price: targetPrice };
-                                        return next;
-                                      });
-                                      notify.success(`Margin ${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')}`);
-                                    } else if (val >= 100) {
-                                      const targetPrice = roundToKelipatan(unitCost * (1 + (val / 100)), editRoundingStep);
-                                      if (isBase) setEditPriceEcer(targetPrice);
-                                      setEditUnits(prev => {
-                                        const next = [...prev];
-                                        next[idx] = { ...next[idx], price: targetPrice };
-                                        return next;
-                                      });
-                                      notify.success(`Markup +${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')}`);
-                                    }
-                                  }
-                                }}
-                                className="w-10 bg-transparent text-[10px] font-black text-slate-800 text-center focus:outline-none"
-                              />
-                            </div>
+                                  const targetPrice = roundToKelipatan(unitCost / (1 - (val / 100)), editRoundingStep);
+                                  if (isBase) setEditPriceEcer(targetPrice);
+                                  setEditUnits(prev => {
+                                    const next = [...prev];
+                                    next[idx] = { ...next[idx], price: targetPrice };
+                                    return next;
+                                  });
+                                  notify.success(`Margin ${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')} (Bulat Rp ${editRoundingStep})`);
+                                } else {
+                                  // MARKUP
+                                  const targetPrice = roundToKelipatan(unitCost * (1 + (val / 100)), editRoundingStep);
+                                  if (isBase) setEditPriceEcer(targetPrice);
+                                  setEditUnits(prev => {
+                                    const next = [...prev];
+                                    next[idx] = { ...next[idx], price: targetPrice };
+                                    return next;
+                                  });
+                                  notify.success(`Markup +${val}% dari modal diterapkan: Rp ${targetPrice.toLocaleString('id-ID')} (Bulat Rp ${editRoundingStep})`);
+                                }
+                              };
+
+                              return (
+                                <div className="flex items-center gap-1 bg-slate-100 border border-slate-300 rounded-lg px-1.5 py-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const nextMode = currentMode === 'MARGIN' ? 'MARKUP' : 'MARGIN';
+                                      setUnitMarginMode(prev => ({ ...prev, [idx]: nextMode }));
+                                      notify.info(`Beralih ke mode ${nextMode === 'MARGIN' ? 'Margin (% dari Jual)' : 'Markup (% dari Modal)'}`);
+                                    }}
+                                    className={`text-[8.5px] font-black px-1 py-0.2 rounded transition-colors ${
+                                      currentMode === 'MARGIN' ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
+                                    }`}
+                                    title="Klik untuk beralih antara Margin (% dari Jual) dan Markup (% dari Modal)"
+                                  >
+                                    {currentMode === 'MARGIN' ? 'Mgn' : 'Mrk'}
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="-90"
+                                    max="500"
+                                    step="0.5"
+                                    placeholder="±%"
+                                    defaultValue=""
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        applyValue(Number((e.target as HTMLInputElement).value));
+                                      }
+                                    }}
+                                    onBlur={e => {
+                                      if (e.target.value !== '') {
+                                        applyValue(Number(e.target.value));
+                                      }
+                                    }}
+                                    className="w-10 bg-transparent text-[10px] font-black text-slate-800 text-center focus:outline-none"
+                                  />
+                                </div>
+                              );
+                            })()}
 
                             {/* Input Nominal Profit Manual (+Rp) per Satuan */}
                             <div className="flex items-center gap-1 bg-emerald-50 border border-emerald-300 rounded-lg px-1.5 py-0.5" title={`Ketik nominal keuntungan bersih (Rp) yang diinginkan (Bulat Rp ${editRoundingStep}), lalu tekan Enter`}>
@@ -3270,70 +3890,126 @@ export default function PricingHPPPage() {
                 <span className="font-black text-slate-900">{selectedCount} produk</span>
               </div>
 
-              {/* Pilihan Jenis Margin: Persentase vs Nominal */}
+              {/* Pilihan Metode Penetapan Margin / Markup / Nominal */}
               <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase text-slate-500">Pilihan Jenis Margin</label>
-                <div className="grid grid-cols-2 gap-2 bg-slate-200/70 p-1 rounded-2xl">
+                <label className="text-xs font-black uppercase text-slate-500">Metode Penetapan Keuntungan</label>
+                <div className="grid grid-cols-3 gap-1.5 bg-slate-200/70 p-1 rounded-2xl">
                   <button
                     type="button"
                     onClick={() => {
+                      setMarginCalcMode('MARGIN');
                       setMarginType('PERCENT');
-                      if (targetMarginValue > 100) setTargetMarginValue(20);
+                      if (targetMarginValue > 100) setTargetMarginValue(15);
                     }}
-                    className={`py-2 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                      marginType === 'PERCENT'
+                    className={`py-2 text-[11px] font-black rounded-xl transition-all flex flex-col items-center justify-center gap-0.5 ${
+                      marginCalcMode === 'MARGIN'
                         ? 'bg-white text-emerald-700 shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Percent size={13} />
-                    Persentase (%)
+                    <span className="flex items-center gap-1"><Percent size={12} /> Margin %</span>
+                    <span className="text-[9px] font-semibold text-slate-400">(dari Jual)</span>
                   </button>
+
                   <button
                     type="button"
                     onClick={() => {
+                      setMarginCalcMode('MARKUP');
+                      setMarginType('PERCENT');
+                      if (targetMarginValue > 100) setTargetMarginValue(15);
+                    }}
+                    className={`py-2 text-[11px] font-black rounded-xl transition-all flex flex-col items-center justify-center gap-0.5 ${
+                      marginCalcMode === 'MARKUP'
+                        ? 'bg-white text-purple-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1"><TrendingUp size={12} /> Markup %</span>
+                    <span className="text-[9px] font-semibold text-slate-400">(dari Modal)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMarginCalcMode('NOMINAL');
                       setMarginType('NOMINAL');
                       if (targetMarginValue < 100) setTargetMarginValue(5000);
                     }}
-                    className={`py-2 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${
-                      marginType === 'NOMINAL'
-                        ? 'bg-white text-emerald-700 shadow-sm'
+                    className={`py-2 text-[11px] font-black rounded-xl transition-all flex flex-col items-center justify-center gap-0.5 ${
+                      marginCalcMode === 'NOMINAL'
+                        ? 'bg-white text-blue-700 shadow-sm'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <DollarSign size={13} />
-                    Nominal (Rp)
+                    <span className="flex items-center gap-1"><DollarSign size={12} /> Nominal</span>
+                    <span className="text-[9px] font-semibold text-slate-400">(+Rp Tetap)</span>
                   </button>
                 </div>
               </div>
               
-              {/* Input Nilai Margin */}
+              {/* Input Nilai Margin / Markup / Nominal */}
               <div className="space-y-1.5">
                 <label className="text-xs font-black uppercase text-slate-500">
-                  {marginType === 'PERCENT' ? 'Target Persentase Laba' : 'Tambahan Margin Nominal'}
+                  {marginCalcMode === 'MARGIN' ? 'Target Margin (% dari Harga Jual)' : marginCalcMode === 'MARKUP' ? 'Tambahan Markup (% dari Modal Kulakan)' : 'Tambahan Margin Nominal (+Rp)'}
                 </label>
                 <div className="relative">
-                  {marginType === 'NOMINAL' && (
+                  {marginCalcMode === 'NOMINAL' && (
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400 text-sm">Rp</span>
                   )}
                   <input
                     type="number"
                     min="1"
+                    max={marginCalcMode === 'MARGIN' ? 95 : 10000000}
                     value={targetMarginValue}
                     onChange={e => setTargetMarginValue(Number(e.target.value))}
-                    className={`w-full py-3 bg-white border border-slate-300 rounded-2xl font-black text-lg text-emerald-700 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none ${
-                      marginType === 'NOMINAL' ? 'pl-11 pr-4' : 'pl-4 pr-10'
+                    className={`w-full py-3 bg-white border border-slate-300 rounded-2xl font-black text-lg focus:bg-white focus:ring-2 focus:outline-none ${
+                      marginCalcMode === 'NOMINAL'
+                        ? 'pl-11 pr-4 text-blue-700 focus:ring-blue-500'
+                        : marginCalcMode === 'MARKUP'
+                        ? 'pl-4 pr-10 text-purple-700 focus:ring-purple-500'
+                        : 'pl-4 pr-10 text-emerald-700 focus:ring-emerald-500'
                     }`}
                   />
-                  {marginType === 'PERCENT' && (
+                  {marginCalcMode !== 'NOMINAL' && (
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-400 text-lg">%</span>
                   )}
                 </div>
-                <p className="text-[10px] text-slate-400 font-bold mt-1 text-right">
-                  {marginType === 'PERCENT'
-                    ? 'Rumus: Harga Baru = HPP / (1 - Margin%)'
-                    : 'Rumus: Harga Baru = HPP + Nominal Margin'}
-                </p>
+
+                {/* Simulasi Rumus Akuntansi */}
+                <div className="p-2.5 bg-white border border-slate-200 rounded-xl space-y-1 text-[11px] font-bold">
+                  {marginCalcMode === 'MARGIN' && (
+                    <>
+                      <div className="text-emerald-800 flex justify-between">
+                        <span>Rumus: Harga = Modal / (1 - {targetMarginValue}%)</span>
+                        <span className="text-[10px] text-slate-400 font-mono">Standar Retail Modern</span>
+                      </div>
+                      <div className="text-slate-500 text-[10px]">
+                        Contoh Modal Rp 10.000 → Jual <strong className="text-emerald-700">Rp {Math.ceil((10000 / (1 - (targetMarginValue / 100))) / 100) * 100}</strong> (Untung Rp {Math.ceil((10000 / (1 - (targetMarginValue / 100))) / 100) * 100 - 10000})
+                      </div>
+                    </>
+                  )}
+                  {marginCalcMode === 'MARKUP' && (
+                    <>
+                      <div className="text-purple-800 flex justify-between">
+                        <span>Rumus: Harga = Modal * (1 + {targetMarginValue}%)</span>
+                        <span className="text-[10px] text-slate-400 font-mono">Standar Grosir Partai</span>
+                      </div>
+                      <div className="text-slate-500 text-[10px]">
+                        Contoh Modal Rp 10.000 → Jual <strong className="text-purple-700">Rp {Math.ceil((10000 * (1 + (targetMarginValue / 100))) / 100) * 100}</strong> (Untung Rp {Math.ceil((10000 * (1 + (targetMarginValue / 100))) / 100) * 100 - 10000})
+                      </div>
+                    </>
+                  )}
+                  {marginCalcMode === 'NOMINAL' && (
+                    <>
+                      <div className="text-blue-800">
+                        <span>Rumus: Harga = Modal + Rp {targetMarginValue.toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="text-slate-500 text-[10px]">
+                        Contoh Modal Rp 10.000 → Jual <strong className="text-blue-700">Rp {(10000 + targetMarginValue).toLocaleString('id-ID')}</strong> (Untung Rp {targetMarginValue.toLocaleString('id-ID')})
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Pilihan Target Satuan yang Diatur */}

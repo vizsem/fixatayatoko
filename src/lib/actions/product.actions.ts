@@ -1398,10 +1398,20 @@ export async function updateProductPrice(payload: {
   units?: Array<{ code: string; contains: number; price?: number; minQty?: number; label?: string }>;
   isHppLocked?: boolean;
   roundingStep?: number;
+  isKvi?: boolean;
+  shrinkagePct?: number;
+  landedCost?: {
+    inwardFreight?: number;
+    handlingFee?: number;
+    rebatePerUnit?: number;
+    focRatio?: number;
+    taxAdjustment?: number;
+    notes?: string;
+  };
 }): Promise<{ success: boolean; error?: string }> {
   await requireAdmin();
   try {
-    const { productId, newCost, newPrice, newSemiGrosir, newGrosir, newMinGrosir, units, isHppLocked, roundingStep } = payload;
+    const { productId, newCost, newPrice, newSemiGrosir, newGrosir, newMinGrosir, units, isHppLocked, roundingStep, isKvi, shrinkagePct, landedCost } = payload;
 
     // Ambil raw_data saat ini untuk di-merge (jangan overwrite field lain)
     const { data: currentProd, error: fetchErr } = await supabaseAdmin
@@ -1464,6 +1474,18 @@ export async function updateProductPrice(payload: {
         ...(existingRaw.pricingStrategy || {}),
         roundingStep: Number(roundingStep),
       };
+    }
+
+    if (isKvi !== undefined) {
+      updatedRaw.isKvi = Boolean(isKvi);
+    }
+
+    if (shrinkagePct !== undefined) {
+      updatedRaw.shrinkagePct = Number(shrinkagePct || 0);
+    }
+
+    if (landedCost !== undefined) {
+      updatedRaw.landedCost = landedCost;
     }
 
     const { error: updateErr } = await supabaseAdmin
@@ -1833,7 +1855,8 @@ export async function resetAvgHppForProducts(
 }
 
 export interface BulkMarginOptions {
-  marginType?: 'PERCENT' | 'NOMINAL';
+  marginType?: 'PERCENT' | 'PERCENT_MARKUP' | 'PERCENT_MARGIN' | 'NOMINAL';
+  isMarkup?: boolean;
   targetUnitMode?: 'BASE_ONLY' | 'ALL_UNITS' | string;
 }
 
@@ -2001,12 +2024,15 @@ export async function bulkUpdateTargetMargin(
       if (shouldUpdateBasePrice) {
         if (marginType === 'NOMINAL') {
           newBasePrice = cost + marginValue;
+        } else if (marginType === 'PERCENT_MARKUP' || options?.isMarkup) {
+          // Markup %: Harga = Modal * (1 + marginValue / 100)
+          newBasePrice = Math.ceil(cost * (1 + (marginValue / 100)));
         } else {
-          // PERCENT
+          // Margin %: Harga = Modal / (1 - marginValue / 100)
           if (marginValue > 0 && marginValue < 100) {
             newBasePrice = Math.ceil(cost / (1 - (marginValue / 100)));
-          } else if (marginValue >= 100) {
-            newBasePrice = Math.ceil(cost + (cost * (marginValue / 100)));
+          } else {
+            newBasePrice = Math.ceil(cost * (1 + (marginValue / 100)));
           }
         }
         newBasePrice = Math.ceil(newBasePrice / 100) * 100;
@@ -2035,11 +2061,13 @@ export async function bulkUpdateTargetMargin(
             let uPrice = unitCost;
             if (marginType === 'NOMINAL') {
               uPrice = unitCost + (marginValue * contains);
+            } else if (marginType === 'PERCENT_MARKUP' || options?.isMarkup) {
+              uPrice = Math.ceil(unitCost * (1 + (marginValue / 100)));
             } else {
               if (marginValue > 0 && marginValue < 100) {
                 uPrice = Math.ceil(unitCost / (1 - (marginValue / 100)));
-              } else if (marginValue >= 100) {
-                uPrice = Math.ceil(unitCost + (unitCost * (marginValue / 100)));
+              } else {
+                uPrice = Math.ceil(unitCost * (1 + (marginValue / 100)));
               }
             }
             uPrice = Math.ceil(uPrice / 100) * 100;
@@ -2091,6 +2119,52 @@ export async function bulkUpdateTargetMargin(
   } catch (err: any) {
     console.error('bulkUpdateTargetMargin error:', err);
     return { success: false, updated: 0, error: err.message };
+  }
+}
+
+/**
+ * Tandai atau hapus tanda KVI (Known Value Item / Sembako Pokok) secara masal
+ */
+export async function bulkToggleKvi(
+  productIds: string[],
+  isKvi: boolean,
+): Promise<{ success: boolean; count: number; error?: string }> {
+  await requireAdmin();
+  if (!productIds.length) return { success: true, count: 0 };
+
+  try {
+    const now = new Date().toISOString();
+    let count = 0;
+
+    for (const pid of productIds) {
+      const { data: prod } = await supabaseAdmin
+        .from('products')
+        .select('raw_data')
+        .eq('id', pid)
+        .single();
+
+      if (!prod) continue;
+      const raw = prod.raw_data || {};
+      const updatedRaw = {
+        ...raw,
+        isKvi: Boolean(isKvi),
+        updatedAt: now,
+      };
+
+      const { error: upErr } = await supabaseAdmin
+        .from('products')
+        .update({ raw_data: updatedRaw, updated_at: now })
+        .eq('id', pid);
+
+      if (!upErr) count++;
+    }
+
+    revalidatePath('/admin/products/pricing-hpp');
+    revalidatePath('/admin/products');
+    return { success: true, count };
+  } catch (err: any) {
+    console.error('bulkToggleKvi error:', err);
+    return { success: false, count: 0, error: err.message };
   }
 }
 
