@@ -24,6 +24,13 @@ import { sbGetDoc } from '@/lib/supabase-helpers';
 
 type LabelSize = '50x30' | '40x30' | '60x40' | '100x130_3' | '100x130_6';
 
+// Ambil N kata terakhir dari string — untuk label varian agar tidak terlalu panjang
+function lastNWords(str: string = '', n: number = 3): string {
+  if (!str) return '';
+  const words = str.trim().split(/\s+/);
+  return words.slice(-n).join(' ');
+}
+
 interface PrintableItem extends BulkPrintProductItem {
   copies: number;
   isSelected: boolean;
@@ -109,7 +116,7 @@ function LabelCardItem({
                   {formatTitleCase(item.parentName || item.name)}
                 </h2>
                 <span className={`bg-black text-white rounded-[2px] font-bold shrink-0 leading-none ${isSheet3 ? 'px-1.5 py-0.5 text-[7px]' : isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
-                  {formatTitleCase(item.variantName || 'Var')}
+                  {formatTitleCase(lastNWords(item.variantName || 'Var', 3))}
                 </span>
               </div>
             ) : item.isUnitLabel ? (
@@ -118,7 +125,7 @@ function LabelCardItem({
                   {formatTitleCase(item.parentName || item.name)}
                 </h2>
                 <span className={`bg-black text-white rounded-[2px] font-bold shrink-0 leading-none ${isSheet3 ? 'px-1.5 py-0.5 text-[7px]' : isLarge ? 'px-1.5 py-0.5 text-[6.5px]' : 'px-1 py-0.2 text-[5.5px]'}`}>
-                  {formatTitleCase(item.variantName || `Satuan ${item.unit}`)}
+                  {formatTitleCase(lastNWords(item.variantName || `Satuan ${item.unit}`, 3))}
                 </span>
               </div>
             ) : (
