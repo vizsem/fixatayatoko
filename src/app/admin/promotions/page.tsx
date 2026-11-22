@@ -256,17 +256,11 @@ export default function PromotionsPage() {
   }, [loading]);
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Hapus promosi "${name}" secara permanen?`)) return;
+    if (!confirm(`Hapus program promosi "${name}" dari daftar promosi?\n\n(Catatan: Data produk, stok fisik, dan katalog toko Anda tetap aman, tidak akan terhapus).`)) return;
     try {
-      const promo = promotions.find(p => p.id === id);
       await sbDeleteDoc('promotions', id);
-      // Jika promo bertipe min-qty dan memiliki targetId, bersihkan priceTiers di produk
-      if (promo && promo.type === 'min-qty' && promo.targetId) {
-        try {
-          await sbUpdateDoc('products', promo.targetId, { priceTiers: [] });
-        } catch {}
-      }
-      notify.admin.success('Promosi berhasil dihapus.');
+      setPromotions(prev => prev.filter(p => p.id !== id));
+      notify.admin.success('Program promosi berhasil dihapus.');
     } catch {
       notify.admin.error('Gagal menghapus promosi.');
     }

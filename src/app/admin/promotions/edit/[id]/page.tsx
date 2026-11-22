@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import notify from '@/lib/notify';
 import { supabase } from '@/lib/supabase';
-import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { getUserAndRole, sbDeleteDoc, sbGetDoc, sbGetDocs, sbSetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
 import { isAdminRole } from '@/lib/auth-helpers';
 
 export type PromoType =
@@ -170,6 +170,7 @@ export default function EditPromotionPage() {
       // Load specific promo
       if (id) {
         try {
+          let promoFound = false;
           const promoDoc = await sbGetDoc('promotions', id);
           if (promoDoc.exists()) {
             const d = promoDoc.data() as any;
@@ -203,7 +204,58 @@ export default function EditPromotionPage() {
               applyToProductTiers: d.applyToProductTiers !== undefined ? Boolean(d.applyToProductTiers) : true,
               minQtyPricingMode: d.minQtyPricingMode || 'fixed',
             });
+            promoFound = true;
           } else {
+            // Fallback: Jika ID adalah id produk virtual (promo_prod_XYZ atau promo_XYZ)
+            const cleanProdId = id.replace(/^promo_prod_/, '').replace(/^promo_/, '');
+            const prodDoc = await sbGetDoc('products', cleanProdId);
+            if (prodDoc.exists()) {
+              const pData = prodDoc.data() as any;
+              const raw = pData.raw_data || pData;
+              const prodName = String(pData.name || raw.Nama || raw.name || 'Produk');
+              const tiers = Array.isArray(raw.priceTiers) ? raw.priceTiers : [];
+              const primary = tiers.find((t: any) => Number(t.minQty) > 1 && Number(t.price) > 0) || {
+                minQty: Number(raw.Min_Grosir || raw.minWholesale || raw.minGrosir || 3),
+                price: Number(raw.Grosir || raw.wholesalePrice || raw.priceGrosir || 0),
+                label: `Grosir min 3`
+              };
+              const additional = tiers.filter((t: any) => t !== primary && Number(t.minQty) > 1);
+
+              setFormData({
+                name: `Opening - ${prodName}`,
+                type: 'min-qty',
+                discountType: 'fixed',
+                discountValue: Number(primary.price || 0),
+                targetId: cleanProdId,
+                targetName: prodName,
+                code: '',
+                startDate: new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0],
+                endDate: '2099-12-31',
+                isActive: true,
+                minPurchase: 0,
+                maxDiscount: 0,
+                quota: 0,
+                usageCount: 0,
+                maxUsagePerUser: 1,
+                promoStockQuota: 0,
+                buyQty: 2,
+                freeQty: 1,
+                bundleProductIds: [],
+                bundlePrice: 0,
+                allowStacking: false,
+                allowLossLeader: false,
+                minQty: Number(primary.minQty || 3),
+                customTierPrice: Number(primary.price || 0),
+                tierLabel: primary.label || `Grosir min ${primary.minQty || 3}`,
+                tierRules: additional,
+                applyToProductTiers: true,
+                minQtyPricingMode: 'fixed',
+              });
+              promoFound = true;
+            }
+          }
+
+          if (!promoFound) {
             notify.admin.error('Promosi tidak ditemukan.');
             router.push('/admin/promotions');
             return;
@@ -399,7 +451,7 @@ export default function EditPromotionPage() {
         updatedAt: new Date().toISOString(),
       };
 
-      await sbUpdateDoc('promotions', id, payload);
+      await sbSetDoc('promotions', id, payload, { merge: true });
 
       // Sinkronkan ke data priceTiers produk jika promo bertipe min-qty
       if (formData.type === 'min-qty' && formData.applyToProductTiers && formData.targetId) {
