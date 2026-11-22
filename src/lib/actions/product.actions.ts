@@ -585,7 +585,25 @@ export async function updateProductStatus(ids: string[], status: string | number
       throw fetchError;
     }
 
-    for (const p of products || []) {
+    // Saat arsip MAUPUN pulihkan, sertakan semua varian anak dari tiap induk
+    let allProductsToUpdate = [...(products || [])];
+    for (const parentId of ids) {
+      const { data: children } = await supabaseAdmin
+        .from('products')
+        .select('id, raw_data')
+        .eq('raw_data->>Parent_ID', parentId);
+      if (children && children.length > 0) {
+        const existingIds = new Set(allProductsToUpdate.map((p) => p.id));
+        for (const child of children) {
+          if (!existingIds.has(child.id)) {
+            allProductsToUpdate.push(child);
+            existingIds.add(child.id);
+          }
+        }
+      }
+    }
+
+    for (const p of allProductsToUpdate) {
       const raw = (p.raw_data && typeof p.raw_data === 'object') ? { ...p.raw_data } : {};
       raw.isActive = !isArchived;
       raw.Status = isArchived ? 1 : 0;
@@ -4382,7 +4400,24 @@ export async function bulkUpdateProductStatus(
     const now = new Date().toISOString();
     let updated = 0;
 
-    for (const pid of productIds) {
+    // Jika mengarsipkan, kumpulkan semua varian anak dari tiap induk
+    const allIds = [...productIds];
+    if (!isActive) {
+      for (const pid of productIds) {
+        const { data: children } = await supabaseAdmin
+          .from('products')
+          .select('id')
+          .eq('raw_data->>Parent_ID', pid);
+        if (children) {
+          const existing = new Set(allIds);
+          for (const c of children) {
+            if (!existing.has(c.id)) { allIds.push(c.id); existing.add(c.id); }
+          }
+        }
+      }
+    }
+
+    for (const pid of allIds) {
       const { data: prod } = await supabaseAdmin
         .from('products')
         .select('raw_data')
@@ -4390,13 +4425,18 @@ export async function bulkUpdateProductStatus(
         .single();
 
       const existingRaw = (prod?.raw_data as any) || {};
-      const updatedRaw = {
+      const updatedRaw: Record<string, any> = {
         ...existingRaw,
         isActive,
         is_active: isActive,
         status: isActive ? 'ACTIVE' : 'ARCHIVED',
         updatedAt: now,
       };
+      if (!isActive) {
+        updatedRaw.archivedAt = now;
+      } else {
+        delete updatedRaw.archivedAt;
+      }
 
       const { error } = await supabaseAdmin
         .from('products')
