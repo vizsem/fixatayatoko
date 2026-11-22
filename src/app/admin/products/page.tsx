@@ -373,7 +373,7 @@ export default function AdminProducts() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [sortBy, setSortBy] = useState<'createdAt' | 'updatedAt' | 'name'>('createdAt');
-  const [quickFilter, setQuickFilter] = useState<'all' | 'in_stock' | 'out_of_stock' | 'low_stock' | 'no_image' | 'no_cost' | 'pre_order'>('all');
+  const [quickFilter, setQuickFilter] = useState<'all' | 'in_stock' | 'out_of_stock' | 'low_stock' | 'no_image' | 'no_cost' | 'pre_order' | 'recently_restored'>('all');
   const [dbCounts, setDbCounts] = useState<{ active: number; inactive: number }>({ active: 0, inactive: 0 });
 
   useEffect(() => {
@@ -894,6 +894,15 @@ export default function AdminProducts() {
       filtered = filtered.filter(p => Number(p.purchasePrice || p.Modal || 0) <= 0);
     } else if (quickFilter === 'pre_order') {
       filtered = filtered.filter(p => Boolean((p as any).isPreOrder || (p as any).preOrder || (p as any).is_pre_order));
+    } else if (quickFilter === 'recently_restored') {
+      // Produk yang dipulihkan dari arsip hari ini (WIB)
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayStartMs = todayStart.getTime() - 7 * 3600 * 1000; // koreksi WIB
+      filtered = filtered.filter(p => {
+        const rt = (p as any).restoredAt;
+        return rt && Number(rt) >= todayStartMs;
+      });
     }
 
     // Filter mode hierarki varian
@@ -920,6 +929,9 @@ export default function AdminProducts() {
     let noImage = 0;
     let noCost = 0;
     let preOrder = 0;
+    let recentlyRestored = 0;
+    const todayStartRR = new Date(); todayStartRR.setHours(0, 0, 0, 0);
+    const todayStartRRMs = todayStartRR.getTime() - 7 * 3600 * 1000;
     rows.forEach(p => {
       const stock = Number(p.stock || p.Stok || 0);
       const min = Number(p.minStock || p.Min_Stok || 5);
@@ -931,8 +943,10 @@ export default function AdminProducts() {
       if (!hasImage) noImage++;
       if (cost <= 0) noCost++;
       if (Boolean((p as any).isPreOrder || (p as any).preOrder || (p as any).is_pre_order)) preOrder++;
+      const rt = (p as any).restoredAt;
+      if (rt && Number(rt) >= todayStartRRMs) recentlyRestored++;
     });
-    return { inStock, outOfStock, lowStock, noImage, noCost, preOrder };
+    return { inStock, outOfStock, lowStock, noImage, noCost, preOrder, recentlyRestored };
   }, [rows]);
 
   const stats = useMemo(() => {
@@ -1871,6 +1885,22 @@ export default function AdminProducts() {
               </span>
             </button>
 
+            {!showInactive && quickCounts.recentlyRestored > 0 && (
+              <button
+                type="button"
+                onClick={() => { setQuickFilter(quickFilter === 'recently_restored' ? 'all' : 'recently_restored'); setCurrentPage(1); }}
+                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
+                  quickFilter === 'recently_restored' ? 'bg-teal-600 text-white shadow-xs' : 'bg-white text-teal-600 border border-teal-200 hover:bg-teal-50'
+                }`}
+              >
+                <Archive size={12} />
+                <span>Baru Dipulihkan</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${quickFilter === 'recently_restored' ? 'bg-teal-700 text-white' : 'bg-teal-100 text-teal-700'}`}>
+                  {quickCounts.recentlyRestored}
+                </span>
+              </button>
+            )}
+
             {(quickFilter !== 'all' || searchTerm !== '') && (
               <button
                 type="button"
@@ -1933,6 +1963,17 @@ export default function AdminProducts() {
                               const hrs = Math.floor(diff / 3600000);
                               const days = Math.floor(diff / 86400000);
                               return days > 0 ? `Arsip ${days}h lalu` : hrs > 0 ? `Arsip ${hrs}j lalu` : `Arsip ${mins}m lalu`;
+                            })()}
+                          </span>
+                        )}
+                        {!showInactive && (p as any).restoredAt && (
+                          <span className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 px-1 py-0.2 rounded font-semibold">
+                            {(() => {
+                              const diff = Date.now() - (p as any).restoredAt;
+                              const mins = Math.floor(diff / 60000);
+                              const hrs = Math.floor(diff / 3600000);
+                              const days = Math.floor(diff / 86400000);
+                              return days > 0 ? `Pulih ${days}h lalu` : hrs > 0 ? `Pulih ${hrs}j lalu` : `Pulih ${mins}m lalu`;
                             })()}
                           </span>
                         )}
@@ -2508,6 +2549,17 @@ export default function AdminProducts() {
                                     const hrs = Math.floor(diff / 3600000);
                                     const days = Math.floor(diff / 86400000);
                                     return days > 0 ? `Arsip ${days}h lalu` : hrs > 0 ? `Arsip ${hrs}j lalu` : `Arsip ${mins}m lalu`;
+                                  })()}
+                                </span>
+                              )}
+                              {!showInactive && (p as any).restoredAt && (
+                                <span className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 px-1 py-0.2 rounded font-semibold">
+                                  {(() => {
+                                    const diff = Date.now() - (p as any).restoredAt;
+                                    const mins = Math.floor(diff / 60000);
+                                    const hrs = Math.floor(diff / 3600000);
+                                    const days = Math.floor(diff / 86400000);
+                                    return days > 0 ? `Pulih ${days}h lalu` : hrs > 0 ? `Pulih ${hrs}j lalu` : `Pulih ${mins}m lalu`;
                                   })()}
                                 </span>
                               )}

@@ -199,6 +199,7 @@ export async function getProducts(options?: ProductQueryOptions) {
         poLeadTimeDays: Number(raw.poLeadTimeDays || 3),
         poNotes: raw.poNotes || '',
         archivedAt: raw.archivedAt ? new Date(raw.archivedAt).getTime() : (p.updated_at ? new Date(p.updated_at).getTime() : undefined),
+        restoredAt: raw.restoredAt ? new Date(raw.restoredAt).getTime() : undefined,
         raw_data: raw,
       };
     });
@@ -610,8 +611,10 @@ export async function updateProductStatus(ids: string[], status: string | number
       raw.status = isArchived ? 'ARCHIVED' : 'ACTIVE';
       if (isArchived) {
         raw.archivedAt = now;
+        delete raw.restoredAt;
       } else {
         delete raw.archivedAt;
+        raw.restoredAt = now;  // tandai kapan dipulihkan dari arsip
       }
 
       const { error: updateError } = await supabaseAdmin
@@ -4434,8 +4437,10 @@ export async function bulkUpdateProductStatus(
       };
       if (!isActive) {
         updatedRaw.archivedAt = now;
+        delete updatedRaw.restoredAt;
       } else {
         delete updatedRaw.archivedAt;
+        updatedRaw.restoredAt = now;
       }
 
       const { error } = await supabaseAdmin
