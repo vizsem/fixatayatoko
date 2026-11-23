@@ -10,7 +10,7 @@ import {
   ChevronRight, Percent, Sparkles, AlertCircle, RotateCcw,
   CheckSquare, Square, CheckCircle2, Info, Zap, Split,
   Lock, Unlock, Plus, Trash2, Tag, ShieldCheck, Calculator,
-  Receipt, Building2, Archive
+  Receipt, Building2, Archive, Box, Truck
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import notify from '@/lib/notify';
@@ -161,8 +161,9 @@ export default function PricingHPPPage() {
   const [costLogs, setCostLogs] = useState<CostPriceLog[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
 
-  // Mode Tampilan Tabel: Satuan Ecer Dasar vs Satuan Grosir (Dus/Karton/Karung)
-  const [tableViewMode, setTableViewMode] = useState<'BASE' | 'GROSIR'>('BASE');
+  // Mode Tampilan Multi-Tingkat Satuan: 1=Dasar/Ecer, 2=Pack/Renceng/Slop, 3=Dus/Karton, 4=Bal/Karung/Peti, 0=Kemasan Terbesar
+  const [unitTierLevel, setUnitTierLevel] = useState<number>(1);
+  const tableViewMode: 'BASE' | 'GROSIR' = unitTierLevel === 1 ? 'BASE' : 'GROSIR';
 
   // Filter States
   const [search, setSearch] = useState('');
@@ -1631,42 +1632,112 @@ export default function PricingHPPPage() {
                 </select>
               </div>
 
-              {/* Mode Tampilan Analisis: Satuan Dasar (Ecer) vs Satuan Grosir (Dus/Karton) */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl w-fit">
+              {/* Mode Tampilan Analisis Multi-Tingkat Satuan: Ecer vs Pack vs Dus vs Bal */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl flex-wrap">
+                  {/* Tingkat 1: Satuan Dasar Ecer */}
                   <button
                     type="button"
-                    onClick={() => setTableViewMode('BASE')}
+                    onClick={() => setUnitTierLevel(1)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
-                      tableViewMode === 'BASE'
+                      unitTierLevel === 1
                         ? 'bg-white text-blue-700 shadow-sm'
                         : 'text-slate-500 hover:text-slate-800'
                     }`}
+                    title="Tampilkan HPP & Stok satuan terkecil dasar (Pcs/Kg)"
                   >
                     <Package size={13} />
-                    <span>Satuan Dasar / Ecer (Pcs/Kg)</span>
+                    <span>1. Ecer / Dasar ({products[0]?.unit || 'Pcs'})</span>
                   </button>
+
+                  {/* Tingkat 2: Pack / Renceng / Slop */}
                   <button
                     type="button"
-                    onClick={() => setTableViewMode('GROSIR')}
+                    onClick={() => setUnitTierLevel(2)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
-                      tableViewMode === 'GROSIR'
+                      unitTierLevel === 2
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Tampilkan HPP & Stok satuan urutan ke-2 (Pack / Renceng / Slop / Ikat)"
+                  >
+                    <Layers size={13} />
+                    <span>2. Pack / Renceng / Slop</span>
+                  </button>
+
+                  {/* Tingkat 3: Dus / Karton */}
+                  <button
+                    type="button"
+                    onClick={() => setUnitTierLevel(3)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+                      unitTierLevel === 3
                         ? 'bg-purple-600 text-white shadow-sm'
                         : 'text-slate-500 hover:text-slate-800'
                     }`}
+                    title="Tampilkan HPP & Stok satuan urutan ke-3 (Dus / Karton / Box)"
                   >
-                    <Layers size={13} />
-                    <span>Satuan Grosir / Partai (Dus/Karung/Bal)</span>
+                    <Box size={13} />
+                    <span>3. Dus / Karton</span>
+                  </button>
+
+                  {/* Tingkat 4: Bal / Karung / Peti */}
+                  <button
+                    type="button"
+                    onClick={() => setUnitTierLevel(4)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+                      unitTierLevel === 4
+                        ? 'bg-amber-600 text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Tampilkan HPP & Stok satuan urutan ke-4 (Bal / Karung / Peti)"
+                  >
+                    <Truck size={13} />
+                    <span>4. Bal / Karung / Peti</span>
+                  </button>
+
+                  {/* Kemasan Terbesar (Max Bulk) */}
+                  <button
+                    type="button"
+                    onClick={() => setUnitTierLevel(0)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+                      unitTierLevel === 0
+                        ? 'bg-slate-900 text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Otomatis pilih kemasan satuan terbesar yang dimiliki masing-masing produk"
+                  >
+                    <Sparkles size={13} className="text-amber-400" />
+                    <span>Kemasan Terbesar</span>
                   </button>
                 </div>
-                <div className="text-[11px] font-bold text-slate-400">
-                  {tableViewMode === 'GROSIR' ? (
-                    <span className="text-purple-700 font-extrabold flex items-center gap-1">
-                      <ShieldCheck size={13} className="text-purple-600" />
-                      Mode Analisis Partai: Pantau HPP Dus & Proteksi Safety Floor Margin
+
+                <div className="text-[11px] font-bold text-slate-500">
+                  {unitTierLevel === 1 && (
+                    <span>🔍 Menampilkan data modal & harga per satuan terkecil dasar (Pcs/Kg).</span>
+                  )}
+                  {unitTierLevel === 2 && (
+                    <span className="text-indigo-700 font-extrabold flex items-center gap-1">
+                      <Layers size={13} className="text-indigo-600" />
+                      Fokus Satuan Urutan 2: Analisis HPP & Margin Pack, Renceng, Slop, 1Kg.
                     </span>
-                  ) : (
-                    <span>Menampilkan HPP per satuan terkecil dasar (Pcs/Kg)</span>
+                  )}
+                  {unitTierLevel === 3 && (
+                    <span className="text-purple-700 font-extrabold flex items-center gap-1">
+                      <Box size={13} className="text-purple-600" />
+                      Fokus Satuan Urutan 3: Analisis HPP & Margin Dus, Karton, Box utuh.
+                    </span>
+                  )}
+                  {unitTierLevel === 4 && (
+                    <span className="text-amber-700 font-extrabold flex items-center gap-1">
+                      <Truck size={13} className="text-amber-600" />
+                      Fokus Satuan Urutan 4: Analisis HPP & Margin Bal, Karung, Peti partai besar.
+                    </span>
+                  )}
+                  {unitTierLevel === 0 && (
+                    <span className="text-slate-800 font-extrabold flex items-center gap-1">
+                      <ShieldCheck size={13} className="text-emerald-600" />
+                      Kemasan Terbesar: Otomatis memilih satuan volume tertinggi tiap produk.
+                    </span>
                   )}
                 </div>
               </div>
@@ -1917,16 +1988,42 @@ export default function PricingHPPPage() {
                         </th>
                         <th className="py-4 px-4 min-w-[200px] max-w-[280px]">Produk &amp; SKU</th>
                         <th className="py-4 px-4 text-center min-w-[160px]">
-                          {tableViewMode === 'GROSIR' ? 'Stok (Ekuivalen Dus)' : 'Stok & Satuan'}
+                          {unitTierLevel === 1
+                            ? 'Stok & Satuan'
+                            : unitTierLevel === 2
+                            ? 'Stok (Urutan 2: Pack/Slop)'
+                            : unitTierLevel === 3
+                            ? 'Stok (Urutan 3: Dus/Karton)'
+                            : unitTierLevel === 4
+                            ? 'Stok (Urutan 4: Bal/Karung)'
+                            : 'Stok (Kemasan Terbesar)'}
                         </th>
                         <th className="py-4 px-4 text-right min-w-[120px]">
-                          {tableViewMode === 'GROSIR' ? 'HPP Dus / Partai' : 'HPP Aktif'}
+                          {unitTierLevel === 1
+                            ? 'HPP Aktif (Ecer)'
+                            : unitTierLevel === 2
+                            ? 'HPP Satuan 2'
+                            : unitTierLevel === 3
+                            ? 'HPP Satuan 3 (Dus)'
+                            : unitTierLevel === 4
+                            ? 'HPP Satuan 4 (Bal)'
+                            : 'HPP Kemasan Terbesar'}
                         </th>
                         <th className="py-4 px-4 text-right min-w-[110px]">
                           <div className="flex items-center justify-end gap-1">
                             <Sparkles size={12} className="text-amber-500" />
                             <div>
-                              <span>{tableViewMode === 'GROSIR' ? 'AVG PO Dus' : 'AVG HPP (PO)'}</span>
+                              <span>
+                                {unitTierLevel === 1
+                                  ? 'AVG HPP (PO)'
+                                  : unitTierLevel === 2
+                                  ? 'AVG PO Satuan 2'
+                                  : unitTierLevel === 3
+                                  ? 'AVG PO Dus'
+                                  : unitTierLevel === 4
+                                  ? 'AVG PO Bal'
+                                  : 'AVG PO Terbesar'}
+                              </span>
                               {!avgPolicyEnabled && (
                                 <span className="text-[8px] font-bold text-slate-400 block tracking-normal normal-case">
                                   CCTV Saja
@@ -1936,13 +2033,21 @@ export default function PricingHPPPage() {
                           </div>
                         </th>
                         <th className="py-4 px-4 text-right min-w-[110px]">
-                          {tableViewMode === 'GROSIR' ? 'Harga Jual Dus' : 'Harga Jual'}
+                          {unitTierLevel === 1
+                            ? 'Harga Jual (Ecer)'
+                            : unitTierLevel === 2
+                            ? 'Harga Jual Satuan 2'
+                            : unitTierLevel === 3
+                            ? 'Harga Jual Satuan 3'
+                            : unitTierLevel === 4
+                            ? 'Harga Jual Satuan 4'
+                            : 'Harga Jual Terbesar'}
                         </th>
                         <th className="py-4 px-4 text-right min-w-[140px]">
-                          {tableViewMode === 'GROSIR' ? 'Margin Dus (Rp / %)' : 'Margin (Rp / %)'}
+                          {unitTierLevel === 1 ? 'Margin (Rp / %)' : 'Margin Satuan (Rp / %)'}
                         </th>
                         <th className="py-4 px-4 text-center min-w-[110px]">
-                          {tableViewMode === 'GROSIR' ? 'Safety Floor' : 'Grosir'}
+                          {unitTierLevel === 1 ? 'Grosir' : 'Safety Floor'}
                         </th>
                         <th className="py-4 px-5 text-center min-w-[90px]">Aksi</th>
                       </tr>
@@ -1968,11 +2073,52 @@ export default function PricingHPPPage() {
                           )
                           .sort((a, b) => a.contains - b.contains);
 
-                        // Perhitungan Analisis Mode Satuan Grosir / Kartonan
-                        const bulkUnit = p.units
-                          .filter((unit) => unit.code !== p.unit && Number.isFinite(unit.contains) && unit.contains > 1)
-                          .sort((a, b) => b.contains - a.contains)[0];
+                        // Susun semua satuan produk menaik berdasarkan contains (Level 1: Dasar, Level 2: Pack, Level 3: Dus, Level 4: Bal)
+                        const allSortedUnits = [
+                          { code: p.unit, contains: 1, price: p.priceEcer },
+                          ...p.units.filter((unit) => unit.code !== p.unit && Number.isFinite(unit.contains) && unit.contains > 1)
+                        ].sort((a, b) => a.contains - b.contains);
 
+                        // Cari satuan aktif berdasarkan unitTierLevel yang dipilih
+                        let activeBulkUnit = allSortedUnits[0];
+                        let hasTierUnit = false;
+
+                        if (unitTierLevel === 1) {
+                          activeBulkUnit = allSortedUnits[0];
+                        } else if (unitTierLevel === 2) {
+                          // Satuan Urutan ke-2 (Pack / Renceng / Slop / 1KG)
+                          if (allSortedUnits.length > 1) {
+                            activeBulkUnit = allSortedUnits[1];
+                            hasTierUnit = true;
+                          }
+                        } else if (unitTierLevel === 3) {
+                          // Satuan Urutan ke-3 (Dus / Karton / Box)
+                          if (allSortedUnits.length > 2) {
+                            activeBulkUnit = allSortedUnits[2];
+                            hasTierUnit = true;
+                          } else if (allSortedUnits.length > 1) {
+                            activeBulkUnit = allSortedUnits[allSortedUnits.length - 1]; // fallback ke kemasan tertinggi
+                            hasTierUnit = true;
+                          }
+                        } else if (unitTierLevel === 4) {
+                          // Satuan Urutan ke-4 (Bal / Karung / Peti)
+                          if (allSortedUnits.length > 3) {
+                            activeBulkUnit = allSortedUnits[3];
+                            hasTierUnit = true;
+                          } else if (allSortedUnits.length > 1) {
+                            activeBulkUnit = allSortedUnits[allSortedUnits.length - 1];
+                            hasTierUnit = true;
+                          }
+                        } else if (unitTierLevel === 0) {
+                          // Satuan Terbesar (Max Bulk)
+                          if (allSortedUnits.length > 1) {
+                            activeBulkUnit = allSortedUnits[allSortedUnits.length - 1];
+                            hasTierUnit = true;
+                          }
+                        }
+
+                        const isTierActive = unitTierLevel !== 1 && hasTierUnit;
+                        const bulkUnit = isTierActive ? activeBulkUnit : null;
                         const bulkContains = bulkUnit ? bulkUnit.contains : 1;
                         const bulkCode = bulkUnit ? bulkUnit.code : p.unit;
                         const bulkCost = p.costPrice * bulkContains;
@@ -2126,9 +2272,13 @@ export default function PricingHPPPage() {
                                       + {bulkStockSisa} {p.unit}
                                     </span>
                                   )}
-                                  {bulkUnit && (
+                                  {bulkUnit ? (
                                     <span className="text-[9px] font-bold text-indigo-600 block">
                                       (1 {bulkCode} = {bulkContains} {p.unit})
+                                    </span>
+                                  ) : (
+                                    <span className="text-[8.5px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded inline-block">
+                                      Hanya 1 Satuan
                                     </span>
                                   )}
                                 </div>
@@ -2387,21 +2537,25 @@ export default function PricingHPPPage() {
                             {/* Harga Grosir / Safety Floor */}
                             <td className="py-2 px-4 text-right">
                               {tableViewMode === 'GROSIR' ? (
-                                <div className="flex justify-end">
-                                  {isBulkLoss ? (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                                      <AlertTriangle size={9} /> Di Bawah Modal
-                                    </span>
-                                  ) : bulkMarginPct < 1 ? (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                                      ⚠️ Tipis (&lt;1%)
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                      🛡️ Floor Aman
-                                    </span>
-                                  )}
-                                </div>
+                                hasTierUnit ? (
+                                  <div className="flex justify-end">
+                                    {isBulkLoss ? (
+                                      <span className="inline-flex items-center gap-1 text-[9px] font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                                        <AlertTriangle size={9} /> Di Bawah Modal
+                                      </span>
+                                    ) : bulkMarginPct < 1 ? (
+                                      <span className="inline-flex items-center gap-1 text-[9px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                        ⚠️ Tipis (&lt;1%)
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                        🛡️ Floor Aman
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-300 font-bold text-[11px]">-</span>
+                                )
                               ) : p.priceTiers && p.priceTiers.length > 1 ? (
                                 <div className="flex flex-col items-end gap-0.5" title={p.priceTiers.map(t => `${t.label || `Min ${t.minQty}`}: Rp${t.price.toLocaleString('id-ID')}`).join('\n')}>
                                   {p.priceTiers.filter(t => t.minQty > 1).map((t, idx) => (
