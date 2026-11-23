@@ -2168,6 +2168,115 @@ export async function bulkToggleKvi(
   }
 }
 
+/**
+ * Kunci atau Buka Kunci HPP secara masal untuk SEMUA produk aktif di toko.
+ * Mengamankan seluruh produk dari intervensi atau penimpaan AVG PO otomatis.
+ */
+export async function bulkLockAllActiveProductsHpp(
+  isLocked: boolean,
+  adminEmail: string = 'admin'
+): Promise<{ success: boolean; count: number; error?: string }> {
+  await requireAdmin();
+  try {
+    const now = new Date().toISOString();
+    
+    // Ambil semua produk aktif
+    const { data: activeProducts, error: fetchErr } = await supabaseAdmin
+      .from('products')
+      .select('id, cost_price, raw_data')
+      .eq('is_active', true);
+
+    if (fetchErr) throw fetchErr;
+    if (!activeProducts || activeProducts.length === 0) {
+      return { success: true, count: 0 };
+    }
+
+    let updatedCount = 0;
+    const chunkSize = 50;
+    for (let i = 0; i < activeProducts.length; i += chunkSize) {
+      const chunk = activeProducts.slice(i, i + chunkSize);
+      await Promise.all(
+        chunk.map(async (prod) => {
+          const raw = prod.raw_data || {};
+          const currentCost = Number(prod.cost_price || 0);
+          const updatedRaw = {
+            ...raw,
+            isHppLocked: isLocked,
+            customHpp: isLocked ? currentCost : raw.customHpp,
+            customHppUpdatedAt: isLocked ? now : raw.customHppUpdatedAt,
+            lockedBy: isLocked ? adminEmail : undefined,
+            updatedAt: now,
+          };
+          const { error: upErr } = await supabaseAdmin
+            .from('products')
+            .update({ raw_data: updatedRaw, updated_at: now })
+            .eq('id', prod.id);
+
+          if (!upErr) updatedCount++;
+        })
+      );
+    }
+
+    revalidatePath('/admin/products/pricing-hpp');
+    revalidatePath('/admin/products');
+    return { success: true, count: updatedCount };
+  } catch (err: any) {
+    console.error('bulkLockAllActiveProductsHpp error:', err);
+    return { success: false, count: 0, error: err.message || 'Gagal mengunci semua produk aktif' };
+  }
+}
+
+/**
+ * Pengaturan Kebijakan AVG Toko (Store AVG Policy)
+ */
+export async function getStorePricingPolicy(): Promise<{
+  avgEnabled: boolean;
+  mode: 'MANUAL_PROTECTED' | 'AUTO_AVG';
+}> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('settings')
+      .select('raw_data')
+      .eq('id', 'pricing_policy')
+      .maybeSingle();
+
+    if (data?.raw_data) {
+      return {
+        avgEnabled: Boolean(data.raw_data.avgEnabled),
+        mode: data.raw_data.mode === 'AUTO_AVG' ? 'AUTO_AVG' : 'MANUAL_PROTECTED',
+      };
+    }
+  } catch (err) {
+    console.warn('getStorePricingPolicy warning:', err);
+  }
+  // Default aman untuk grosir/sembako: MANUAL_PROTECTED (AVG mati / read-only)
+  return { avgEnabled: false, mode: 'MANUAL_PROTECTED' };
+}
+
+export async function saveStorePricingPolicy(policy: {
+  avgEnabled: boolean;
+  mode: 'MANUAL_PROTECTED' | 'AUTO_AVG';
+}): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+  try {
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin.from('settings').upsert({
+      id: 'pricing_policy',
+      raw_data: {
+        ...policy,
+        updatedAt: now,
+      },
+      updated_at: now,
+    });
+    if (error) throw error;
+    revalidatePath('/admin/products/pricing-hpp');
+    return { success: true };
+  } catch (err: any) {
+    console.error('saveStorePricingPolicy error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 export interface BulkWholesaleOptions {
   mode: 'DISCOUNT_PERCENT' | 'DISCOUNT_NOMINAL' | 'MARGIN_COST' | 'FIXED_PRICE';
   value: number; // nilai persentase diskon, potongan nominal, persentase margin, atau harga grosir tetap

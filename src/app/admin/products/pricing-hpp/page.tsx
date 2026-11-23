@@ -39,6 +39,9 @@ import {
   type PriceTierRule,
   bulkUpdateProductStatus,
   bulkToggleKvi,
+  bulkLockAllActiveProductsHpp,
+  getStorePricingPolicy,
+  saveStorePricingPolicy,
 } from '@/lib/actions/product.actions';
 
 export interface ProductUnitItem {
@@ -173,6 +176,13 @@ export default function PricingHPPPage() {
   const [taxSettings, setTaxSettings] = useState<TaxSettings>(DEFAULT_TAX_SETTINGS);
   const [sortBy, setSortBy] = useState<'urgent_first' | 'po_latest' | 'name' | 'marginPct_desc' | 'marginPct_asc' | 'cost_desc' | 'price_desc' | 'stock_desc' | 'avg_diff'>('urgent_first');
 
+  // Kebijakan AVG & Proteksi Bentrok Sembako
+  const [avgPolicyEnabled, setAvgPolicyEnabled] = useState<boolean>(false); // Default: Proteksi Manual (AVG CCTV Only)
+  const [savingPolicy, setSavingPolicy] = useState<boolean>(false);
+  const [isLockingAll, setIsLockingAll] = useState<boolean>(false);
+  const [showLockAllModal, setShowLockAllModal] = useState<boolean>(false);
+  const [lockAllActionType, setLockAllActionType] = useState<'LOCK' | 'UNLOCK'>('LOCK');
+
   // Multi-select States
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showResetModal, setShowResetModal] = useState(false);
@@ -236,7 +246,7 @@ export default function PricingHPPPage() {
   const [newUnitContains, setNewUnitContains] = useState<number>(24);
   const [newUnitPrice, setNewUnitPrice] = useState<number>(0);
 
-  // Check auth
+  // Check auth & load AVG pricing policy
   useEffect(() => {
     (async () => {
       const { user, isAdmin } = await getUserAndRole();
@@ -244,6 +254,12 @@ export default function PricingHPPPage() {
       if (!isAdmin) {
         notify.aksesDitolakAdmin();
         return router.push('/profil');
+      }
+      try {
+        const policy = await getStorePricingPolicy();
+        setAvgPolicyEnabled(policy.avgEnabled);
+      } catch (err) {
+        console.warn('Gagal memuat kebijakan AVG:', err);
       }
     })();
   }, [router]);
@@ -1106,6 +1122,58 @@ export default function PricingHPPPage() {
     });
   };
 
+  // Toggle Kebijakan Otomasi AVG Toko (On / Off Proteksi Manual)
+  const handleToggleAvgPolicy = async () => {
+    const nextState = !avgPolicyEnabled;
+    setSavingPolicy(true);
+    try {
+      const res = await saveStorePricingPolicy({
+        avgEnabled: nextState,
+        mode: nextState ? 'AUTO_AVG' : 'MANUAL_PROTECTED',
+      });
+      if (res.success) {
+        setAvgPolicyEnabled(nextState);
+        notify.success(
+          nextState
+            ? 'Otomasi AVG diaktifkan. Nilai PO dapat memengaruhi pergerakan HPP.'
+            : '🛡️ Mode Proteksi Manual Aktif! Kolom AVG kini hanya berfungsi sebagai referensi baca (CCTV) dan aman dari bentrok.'
+        );
+      } else {
+        notify.error(res.error || 'Gagal mengubah kebijakan AVG');
+      }
+    } catch (err: any) {
+      notify.error(err.message || 'Gagal mengubah kebijakan AVG');
+    } finally {
+      setSavingPolicy(false);
+    }
+  };
+
+  // Kunci / Buka Kunci HPP Masal untuk SEMUA Produk Aktif
+  const handleExecuteLockAllActive = async (lock: boolean) => {
+    setIsLockingAll(true);
+    try {
+      const userRes = await supabase.auth.getUser();
+      const adminEmail = userRes.data.user?.email || 'admin';
+      const res = await bulkLockAllActiveProductsHpp(lock, adminEmail);
+      setShowLockAllModal(false);
+      if (res.success) {
+        notify.success(
+          lock
+            ? `🛡️ Berhasil mengunci HPP ${res.count} produk aktif! Modal toko aman 100% dari bentrok AVG.`
+            : `🔓 Berhasil membuka kunci HPP ${res.count} produk aktif.`
+        );
+        setProducts(prev => prev.map(p => p.isActive ? { ...p, isHppLocked: lock } : p));
+        await fetchData();
+      } else {
+        notify.error(res.error || 'Gagal memproses penguncian massal');
+      }
+    } catch (err: any) {
+      notify.error(err.message || 'Gagal memproses penguncian massal');
+    } finally {
+      setIsLockingAll(false);
+    }
+  };
+
   // Open Quick Edit
   const handleOpenEdit = (p: ProductItem) => {
     setEditingProduct(p);
@@ -1602,6 +1670,79 @@ export default function PricingHPPPage() {
                   )}
                 </div>
               </div>
+
+              {/* Panel Kendali Kebijakan AVG Toko & Proteksi Bentrok Sembako */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-slate-50 via-blue-50/20 to-amber-50/30 border border-slate-200/90 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-xl shrink-0 ${avgPolicyEnabled ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                    {avgPolicyEnabled ? <Zap size={18} /> : <ShieldCheck size={18} />}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-black text-slate-800">
+                        Otomasi AVG PO:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleToggleAvgPolicy}
+                        disabled={savingPolicy}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                          avgPolicyEnabled ? 'bg-amber-500' : 'bg-slate-300'
+                        }`}
+                        title={avgPolicyEnabled ? 'Klik untuk mematikan otomasi AVG (Aktifkan Mode Proteksi Manual)' : 'Klik untuk mengaktifkan otomasi AVG'}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
+                            avgPolicyEnabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                      <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${
+                        avgPolicyEnabled
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                          : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                      }`}>
+                        {avgPolicyEnabled ? 'AKTIF (Auto AVG)' : 'NONAKTIF / CCTV SAJA (Manual Protected)'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                      {avgPolicyEnabled
+                        ? '⚠️ Otomatisasi aktif: Nilai AVG PO berpotensi memengaruhi HPP saat disinkronkan.'
+                        : '🛡️ Aman & Akurat: HPP 100% dikendalikan input faktur/manual. Nilai AVG PO hanya sebagai pembanding (CCTV).'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tombol Proteksi Massal Seluruh Produk Aktif */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLockAllActionType('LOCK');
+                      setShowLockAllModal(true);
+                    }}
+                    disabled={isLockingAll}
+                    className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm shadow-blue-200"
+                    title="Kunci HPP SEMUA produk aktif di katalog toko agar aman 100% dari bentrok AVG"
+                  >
+                    <Lock size={12} />
+                    <span>Kunci HPP Semua Produk Aktif</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLockAllActionType('UNLOCK');
+                      setShowLockAllModal(true);
+                    }}
+                    disabled={isLockingAll}
+                    className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                    title="Buka kunci HPP seluruh produk aktif agar dapat disinkronkan kembali"
+                  >
+                    <Unlock size={12} />
+                    <span>Buka Kunci Semua</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* BULK ACTION BAR */}
@@ -1784,7 +1925,14 @@ export default function PricingHPPPage() {
                         <th className="py-4 px-4 text-right min-w-[110px]">
                           <div className="flex items-center justify-end gap-1">
                             <Sparkles size={12} className="text-amber-500" />
-                            {tableViewMode === 'GROSIR' ? 'AVG PO Dus' : 'AVG HPP (PO)'}
+                            <div>
+                              <span>{tableViewMode === 'GROSIR' ? 'AVG PO Dus' : 'AVG HPP (PO)'}</span>
+                              {!avgPolicyEnabled && (
+                                <span className="text-[8px] font-bold text-slate-400 block tracking-normal normal-case">
+                                  CCTV Saja
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </th>
                         <th className="py-4 px-4 text-right min-w-[110px]">
@@ -3411,6 +3559,91 @@ export default function PricingHPPPage() {
               >
                 {savingEdit ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
                 Simpan Perubahan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== MODAL KONFIRMASI KUNCI/BUKA KUNCI SEMUA PRODUK AKTIF ===================== */}
+      {showLockAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5">
+            <div className="flex items-start gap-4">
+              <div className={`p-3 rounded-2xl shrink-0 ${lockAllActionType === 'LOCK' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-700'}`}>
+                {lockAllActionType === 'LOCK' ? <Lock size={24} /> : <Unlock size={24} />}
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">
+                  {lockAllActionType === 'LOCK' ? 'Kunci HPP Semua Produk Aktif' : 'Buka Kunci HPP Semua Produk Aktif'}
+                </h3>
+                <p className="text-xs text-slate-500 font-bold mt-1">
+                  {lockAllActionType === 'LOCK'
+                    ? 'Proteksi penuh: Mengunci nilai HPP (Modal) seluruh produk aktif toko agar tidak tertimpa atau bentrok dengan pergerakan riwayat PO.'
+                    : 'Membuka kunci HPP seluruh produk aktif agar nilai modal dapat mengikuti sinkronisasi AVG PO kembali.'}
+                </p>
+              </div>
+            </div>
+
+            {lockAllActionType === 'LOCK' ? (
+              <div className="p-4 bg-blue-50/70 rounded-2xl border border-blue-200 space-y-2 text-xs text-blue-900">
+                <p className="font-black flex items-center gap-1.5">
+                  <ShieldCheck size={14} className="text-blue-700 shrink-0" />
+                  Keuntungan Mode Terkunci (Standar Sembako):
+                </p>
+                <ul className="space-y-1.5 pl-5 list-disc text-[11px] font-medium text-blue-800">
+                  <li>Modal HPP saat ini menjadi patokan baku dan aman 100% dari kesalahan staf input PO.</li>
+                  <li>HPP tidak akan berubah otomatis saat harga pasar atau nota supplier berfluktuasi.</li>
+                  <li>Kolom AVG PO tetap berfungsi sebagai data pembanding (CCTV) tanpa mengubah harga modal aktif Anda.</li>
+                </ul>
+              </div>
+            ) : (
+              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900">
+                <p className="font-black flex items-center gap-1">
+                  <AlertTriangle size={14} className="text-amber-700 shrink-0" />
+                  Perhatian:
+                </p>
+                <p className="text-[11px] font-medium mt-1 text-amber-800">
+                  Saat kunci dibuka, produk berpotensi disinkronkan kembali jika Anda atau staf menjalankan fitur Restart AVG atau Sinkronisasi PO.
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowLockAllModal(false)}
+                disabled={isLockingAll}
+                className="px-5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExecuteLockAllActive(lockAllActionType === 'LOCK')}
+                disabled={isLockingAll}
+                className={`px-6 py-2.5 rounded-2xl text-white font-black text-xs transition-all flex items-center gap-2 shadow-sm disabled:opacity-60 ${
+                  lockAllActionType === 'LOCK'
+                    ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'
+                    : 'bg-amber-600 hover:bg-amber-700 shadow-amber-200'
+                }`}
+              >
+                {isLockingAll ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    Memproses...
+                  </>
+                ) : lockAllActionType === 'LOCK' ? (
+                  <>
+                    <Lock size={14} />
+                    Ya, Kunci Semua Produk Aktif
+                  </>
+                ) : (
+                  <>
+                    <Unlock size={14} />
+                    Ya, Buka Kunci Semua
+                  </>
+                )}
               </button>
             </div>
           </div>
