@@ -308,6 +308,10 @@ const normalizeText = (v: unknown) =>
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
 const roundUpToStep = (value: number, step: number) => {
+  if (step === -50) {
+    if (value <= 0) return 50;
+    return Math.ceil((value - 50) / 100) * 100 + 50;
+  }
   const s = step > 0 ? step : 1;
   return Math.ceil(value / s) * s;
 };

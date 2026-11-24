@@ -125,6 +125,10 @@ interface CostPriceLog {
 }
 
 const roundToKelipatan = (val: number, step: number = 100) => {
+  if (step === -50) {
+    if (val <= 0) return 50;
+    return Math.ceil((val - 50) / 100) * 100 + 50;
+  }
   const s = step > 0 ? step : 1;
   return Math.ceil(val / s) * s;
 };
@@ -3118,18 +3122,25 @@ export default function PricingHPPPage() {
                   {/* Selector Kelipatan Pembulatan */}
                   <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200" title="Kelipatan pembulatan harga jual di bilangan akhiran">
                     <span className="text-[9px] font-black uppercase text-slate-500 pl-1.5 pr-0.5">Bulatkan:</span>
-                    {[50, 100, 500, 1000].map(step => (
+                    {[
+                      { value: -50, label: '...50', title: 'Pasti Akhiran 50 (contoh: 1.050, 1.950, 2.450, 10.450)' },
+                      { value: 50, label: '50', title: 'Kelipatan 50 (bisa berakhiran 00 atau 50)' },
+                      { value: 100, label: '100', title: 'Kelipatan 100 (contoh: 1.100, 2.000)' },
+                      { value: 500, label: '500', title: 'Kelipatan 500 (contoh: 1.500, 2.000)' },
+                      { value: 1000, label: '1rb', title: 'Kelipatan 1.000 (contoh: 1.000, 2.000)' },
+                    ].map(item => (
                       <button
-                        key={step}
+                        key={item.value}
                         type="button"
-                        onClick={() => setEditRoundingStep(step)}
+                        onClick={() => setEditRoundingStep(item.value)}
                         className={`px-1.5 py-0.5 rounded-lg text-[10px] font-black transition-all ${
-                          editRoundingStep === step
+                          editRoundingStep === item.value
                             ? 'bg-blue-600 text-white shadow-2xs'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
                         }`}
+                        title={item.title}
                       >
-                        {step === 1000 ? '1rb' : step}
+                        {item.label}
                       </button>
                     ))}
                   </div>
@@ -3150,7 +3161,7 @@ export default function PricingHPPPage() {
                         if (isBase) setEditPriceEcer(newPrice);
                         return { ...u, price: newPrice };
                       }));
-                      notify.success(`Semua satuan diset ke harga rekomendasi (Bulat Rp ${editRoundingStep})!`);
+                      notify.success(`Semua satuan diset ke harga rekomendasi (${editRoundingStep === -50 ? 'Pasti Akhiran ...50' : `Bulat Rp ${editRoundingStep}`})!`);
                     }}
                     className="text-[11px] font-black text-amber-800 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-xl transition-colors flex items-center gap-1"
                     title="Set semua satuan ke harga rekomendasi margin target agar peringatan 'Perlu naik' hilang"
@@ -3501,7 +3512,7 @@ export default function PricingHPPPage() {
                                     next[idx] = { ...next[idx], price: targetPrice };
                                     return next;
                                   });
-                                  notify.success(`Margin ${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')} (Bulat Rp ${editRoundingStep})`);
+                                  notify.success(`Margin ${val}% diterapkan: Rp ${targetPrice.toLocaleString('id-ID')} (${editRoundingStep === -50 ? 'Akhiran ...50' : `Bulat Rp ${editRoundingStep}`})`);
                                 } else {
                                   // MARKUP
                                   const targetPrice = roundToKelipatan(unitCost * (1 + (val / 100)), editRoundingStep);
@@ -3511,7 +3522,7 @@ export default function PricingHPPPage() {
                                     next[idx] = { ...next[idx], price: targetPrice };
                                     return next;
                                   });
-                                  notify.success(`Markup +${val}% dari modal diterapkan: Rp ${targetPrice.toLocaleString('id-ID')} (Bulat Rp ${editRoundingStep})`);
+                                  notify.success(`Markup +${val}% dari modal diterapkan: Rp ${targetPrice.toLocaleString('id-ID')} (${editRoundingStep === -50 ? 'Akhiran ...50' : `Bulat Rp ${editRoundingStep}`})`);
                                 }
                               };
 
