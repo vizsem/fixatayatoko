@@ -4644,3 +4644,247 @@ export async function bulkUpdateProductStatus(
     return { success: false, updated: 0, error: err?.message || 'Gagal mengubah status aktif/arsip produk' };
   }
 }
+
+export interface MergeTwoProductsPayload {
+  primaryProductId: string;
+  secondaryProductId: string;
+  stockMode: 'USE_SECONDARY' | 'SUM' | 'KEEP_PRIMARY';
+  priceMode?: 'KEEP_PRIMARY' | 'USE_SECONDARY';
+  archiveSecondary?: boolean;
+  migrateVariants?: boolean;
+}
+
+/**
+ * Menggabungkan 2 produk (termasuk produk varian atau induk bervarian) menjadi 1 produk utama:
+ * - Nama, Kategori, Barcode, dan Struktur Satuan mengikuti Produk Utama (primaryProductId)
+ * - HPP (Modal Dasar) mengikuti Produk ke-2 (secondaryProductId)
+ * - Stok mengikuti pilihan (default: mengikuti stok Produk ke-2)
+ * - Anak varian dari Produk ke-2 (jika ada) otomatis dipindahkan ke Produk Utama
+ * - Produk ke-2 diarsipkan agar tidak dobel di kasir/katalog
+ */
+export async function mergeTwoProductsAction(
+  payload: MergeTwoProductsPayload
+): Promise<{
+  success: boolean;
+  newCost?: number;
+  newStock?: number;
+  migratedVariantsCount?: number;
+  error?: string;
+}> {
+  const identity = await requireAdmin();
+  try {
+    const {
+      primaryProductId,
+      secondaryProductId,
+      stockMode = 'USE_SECONDARY',
+      priceMode = 'KEEP_PRIMARY',
+      archiveSecondary = true,
+      migrateVariants = true,
+    } = payload;
+
+    if (!primaryProductId || !secondaryProductId) {
+      return { success: false, error: 'Pilih 2 produk yang akan digabungkan.' };
+    }
+    if (primaryProductId === secondaryProductId) {
+      return { success: false, error: 'Produk Utama dan Produk ke-2 tidak boleh sama.' };
+    }
+
+    const [{ data: primaryProd, error: pErr }, { data: secondaryProd, error: sErr }] = await Promise.all([
+      supabaseAdmin.from('products').select('*').eq('id', primaryProductId).single(),
+      supabaseAdmin.from('products').select('*').eq('id', secondaryProductId).single(),
+    ]);
+
+    if (pErr || !primaryProd) return { success: false, error: 'Produk Utama tidak ditemukan.' };
+    if (sErr || !secondaryProd) return { success: false, error: 'Produk ke-2 (Sumber HPP) tidak ditemukan.' };
+
+    const now = new Date().toISOString();
+    const primaryRaw = (primaryProd.raw_data && typeof primaryProd.raw_data === 'object') ? { ...primaryProd.raw_data } : {};
+    const secondaryRaw = (secondaryProd.raw_data && typeof secondaryProd.raw_data === 'object') ? { ...secondaryProd.raw_data } : {};
+
+    const oldCost = Number(primaryProd.cost_price ?? primaryRaw.Modal ?? primaryRaw.purchasePrice ?? 0);
+    const oldStock = Number(primaryProd.stock ?? primaryRaw.stock ?? 0);
+    const oldPrice = Number(primaryProd.price ?? primaryRaw.Ecer ?? primaryRaw.price ?? 0);
+
+    const newCost = Number(secondaryProd.cost_price ?? secondaryRaw.Modal ?? secondaryRaw.purchasePrice ?? 0);
+    const secondaryStock = Number(secondaryProd.stock ?? secondaryRaw.stock ?? 0);
+    const secondaryPrice = Number(secondaryProd.price ?? secondaryRaw.Ecer ?? secondaryRaw.price ?? 0);
+
+    let newStock = oldStock;
+    if (stockMode === 'USE_SECONDARY') {
+      newStock = secondaryStock;
+    } else if (stockMode === 'SUM') {
+      newStock = oldStock + secondaryStock;
+    }
+
+    const newPrice = priceMode === 'USE_SECONDARY' && secondaryPrice > 0 ? secondaryPrice : oldPrice;
+
+    // Pertahankan satuan milik Produk Utama
+    const baseUnit = String(primaryProd.unit || primaryRaw.unit || primaryRaw.Satuan || 'PCS').trim().toUpperCase();
+    let updatedUnits = Array.isArray(primaryRaw.units) ? [...primaryRaw.units] : [];
+    if (priceMode === 'USE_SECONDARY' && newPrice !== oldPrice && updatedUnits.length > 0) {
+      updatedUnits = updatedUnits.map((u: any) => {
+        if (String(u.code || '').trim().toUpperCase() === baseUnit) {
+          return { ...u, price: newPrice, contains: 1 };
+        }
+        return u;
+      });
+    }
+
+    // Tangani stockByWarehouse
+    let mergedWarehouseStock: Record<string, number> | undefined = primaryRaw.stockByWarehouse
+      ? { ...primaryRaw.stockByWarehouse }
+      : undefined;
+    const secWh = (secondaryRaw.stockByWarehouse && typeof secondaryRaw.stockByWarehouse === 'object')
+      ? secondaryRaw.stockByWarehouse as Record<string, number>
+      : undefined;
+
+    if (stockMode === 'USE_SECONDARY') {
+      if (secWh && Object.keys(secWh).length > 0) {
+        mergedWarehouseStock = { ...secWh };
+      } else if (mergedWarehouseStock) {
+        const firstWh = Object.keys(mergedWarehouseStock)[0];
+        if (firstWh) mergedWarehouseStock = { [firstWh]: newStock };
+      }
+    } else if (stockMode === 'SUM' && secWh) {
+      mergedWarehouseStock = mergedWarehouseStock || {};
+      for (const [whId, qty] of Object.entries(secWh)) {
+        mergedWarehouseStock[whId] = Number(mergedWarehouseStock[whId] || 0) + Number(qty || 0);
+      }
+    }
+
+    const updatedPrimaryRaw: Record<string, any> = {
+      ...primaryRaw,
+      Modal: newCost,
+      costPrice: newCost,
+      purchasePrice: newCost,
+      customHpp: newCost,
+      isHppLocked: true,
+      customHppUpdatedAt: now,
+      lockedBy: identity.email || 'admin_merge_products',
+      stock: newStock,
+      Stok: newStock,
+      Ecer: newPrice,
+      price: newPrice,
+      priceEcer: newPrice,
+      ...(updatedUnits.length > 0 ? { units: updatedUnits } : {}),
+      ...(mergedWarehouseStock ? { stockByWarehouse: mergedWarehouseStock } : {}),
+      mergedFromProductId: secondaryProductId,
+      mergedFromProductName: secondaryProd.name,
+      mergedAt: now,
+      updatedAt: now,
+    };
+
+    const { error: upPrimaryErr } = await supabaseAdmin
+      .from('products')
+      .update({
+        cost_price: newCost,
+        stock: newStock,
+        price: newPrice,
+        raw_data: updatedPrimaryRaw,
+        updated_at: now,
+      })
+      .eq('id', primaryProductId);
+
+    if (upPrimaryErr) throw upPrimaryErr;
+
+    // Pindahkan varian anak jika Produk ke-2 merupakan induk yang memiliki varian
+    let migratedVariantsCount = 0;
+    if (migrateVariants) {
+      const { data: secChildren } = await supabaseAdmin
+        .from('products')
+        .select('id, raw_data')
+        .eq('raw_data->>Parent_ID', secondaryProductId);
+
+      for (const child of secChildren || []) {
+        if (child.id === primaryProductId) continue;
+        const cRaw = (child.raw_data && typeof child.raw_data === 'object') ? { ...child.raw_data } : {};
+        cRaw.Parent_ID = primaryProductId;
+        cRaw.parentId = primaryProductId;
+        cRaw.updatedAt = now;
+        const { error: childErr } = await supabaseAdmin
+          .from('products')
+          .update({ raw_data: cRaw, updated_at: now })
+          .eq('id', child.id);
+        if (!childErr) migratedVariantsCount++;
+      }
+    }
+
+    // Arsipkan Produk ke-2 agar tidak ganda
+    if (archiveSecondary) {
+      const archivedRaw: Record<string, any> = {
+        ...secondaryRaw,
+        isActive: false,
+        is_active: false,
+        status: 'ARCHIVED',
+        archivedAt: now,
+        mergedIntoProductId: primaryProductId,
+        mergedIntoProductName: primaryProd.name,
+        mergedAt: now,
+        updatedAt: now,
+      };
+      await supabaseAdmin
+        .from('products')
+        .update({
+          is_active: false,
+          stock: 0,
+          raw_data: archivedRaw,
+          updated_at: now,
+        })
+        .eq('id', secondaryProductId);
+    }
+
+    // Catat log perubahan HPP & Stok
+    if (oldCost !== newCost || oldPrice !== newPrice) {
+      try {
+        await supabaseAdmin.from('product_cost_logs').insert({
+          id: `pcl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          productId: primaryProductId,
+          productName: primaryProd.name,
+          oldCost,
+          newCost,
+          oldPrice,
+          newPrice,
+          adminEmail: identity.email || 'admin',
+          changeDate: now,
+          notes: `Gabung produk dengan "${secondaryProd.name}" (HPP & stok ikut produk ke-2, satuan tetap utama)`,
+          source: 'MERGE_PRODUCT',
+          created_at: now,
+        });
+      } catch (logErr) {
+        console.warn('Gagal catat product_cost_logs saat merge:', logErr);
+      }
+    }
+
+    if (oldStock !== newStock) {
+      try {
+        await addInventoryLog({
+          productId: primaryProductId,
+          productName: primaryProd.name,
+          type: newStock >= oldStock ? 'MASUK' : 'KELUAR',
+          source: 'RECONCILIATION',
+          amount: Math.abs(newStock - oldStock),
+          adminId: identity.email || 'admin',
+          note: `Gabung 2 produk jadi 1 dengan "${secondaryProd.name}" (Mode stok: ${stockMode})`,
+          prevStock: oldStock,
+          nextStock: newStock,
+        });
+      } catch (invErr) {
+        console.warn('Gagal catat inventory_logs saat merge:', invErr);
+      }
+    }
+
+    revalidatePath('/admin/products/pricing-hpp');
+    revalidatePath('/admin/products');
+    revalidatePath('/admin/inventory');
+
+    return {
+      success: true,
+      newCost,
+      newStock,
+      migratedVariantsCount,
+    };
+  } catch (err: any) {
+    console.error('mergeTwoProductsAction error:', err);
+    return { success: false, error: err?.message || 'Gagal menggabungkan 2 produk' };
+  }
+}

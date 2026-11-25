@@ -10,7 +10,7 @@ import {
   ChevronRight, Percent, Sparkles, AlertCircle, RotateCcw,
   CheckSquare, Square, CheckCircle2, Info, Zap, Split,
   Lock, Unlock, Plus, Trash2, Tag, ShieldCheck, Calculator,
-  Receipt, Building2, Archive, Box, Truck
+  Receipt, Building2, Archive, Box, Truck, GitMerge, ArrowRightLeft
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import notify from '@/lib/notify';
@@ -42,6 +42,7 @@ import {
   bulkLockAllActiveProductsHpp,
   getStorePricingPolicy,
   saveStorePricingPolicy,
+  mergeTwoProductsAction,
 } from '@/lib/actions/product.actions';
 
 export interface ProductUnitItem {
@@ -187,6 +188,14 @@ export default function PricingHPPPage() {
   const [isLockingAll, setIsLockingAll] = useState<boolean>(false);
   const [showLockAllModal, setShowLockAllModal] = useState<boolean>(false);
   const [lockAllActionType, setLockAllActionType] = useState<'LOCK' | 'UNLOCK'>('LOCK');
+
+  // Gabung 2 Produk Jadi Satu States
+  const [showMergeProductsModal, setShowMergeProductsModal] = useState(false);
+  const [mergePrimaryId, setMergePrimaryId] = useState<string>('');
+  const [mergeSecondaryId, setMergeSecondaryId] = useState<string>('');
+  const [mergeStockMode, setMergeStockMode] = useState<'USE_SECONDARY' | 'SUM' | 'KEEP_PRIMARY'>('USE_SECONDARY');
+  const [mergePriceMode, setMergePriceMode] = useState<'KEEP_PRIMARY' | 'USE_SECONDARY'>('KEEP_PRIMARY');
+  const [isMergingProducts, setIsMergingProducts] = useState(false);
 
   // Multi-select States
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -1179,6 +1188,49 @@ export default function PricingHPPPage() {
     }
   };
 
+  // Gabung 2 Produk Jadi Satu (Mendukung Produk Reguler maupun Varian)
+  const handleOpenMergeProducts = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length !== 2) {
+      notify.error('Pilih tepat 2 produk yang ingin digabungkan.');
+      return;
+    }
+    setMergePrimaryId(ids[0]);
+    setMergeSecondaryId(ids[1]);
+    setMergeStockMode('USE_SECONDARY');
+    setMergePriceMode('KEEP_PRIMARY');
+    setShowMergeProductsModal(true);
+  };
+
+  const handleConfirmMergeProducts = async () => {
+    if (!mergePrimaryId || !mergeSecondaryId) return;
+    setIsMergingProducts(true);
+    try {
+      const res = await mergeTwoProductsAction({
+        primaryProductId: mergePrimaryId,
+        secondaryProductId: mergeSecondaryId,
+        stockMode: mergeStockMode,
+        priceMode: mergePriceMode,
+        archiveSecondary: true,
+        migrateVariants: true,
+      });
+      if (!res.success) {
+        notify.error(res.error || 'Gagal menggabungkan produk');
+        return;
+      }
+      setShowMergeProductsModal(false);
+      setSelectedIds(new Set());
+      notify.success(
+        `✅ 2 produk berhasil digabungkan! HPP menjadi Rp ${(res.newCost || 0).toLocaleString('id-ID')} dan Stok menjadi ${res.newStock ?? 0}.`
+      );
+      await fetchData();
+    } catch (err: any) {
+      notify.error(err.message || 'Gagal menggabungkan produk');
+    } finally {
+      setIsMergingProducts(false);
+    }
+  };
+
   // Open Quick Edit
   const handleOpenEdit = (p: ProductItem) => {
     setEditingProduct(p);
@@ -1845,6 +1897,17 @@ export default function PricingHPPPage() {
                     <X size={13} />
                     Batal
                   </button>
+                  {selectedCount === 2 && (
+                    <button
+                      type="button"
+                      onClick={handleOpenMergeProducts}
+                      className="px-3.5 py-2 bg-fuchsia-500 hover:bg-fuchsia-400 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm border border-fuchsia-300/60"
+                      title="Gabungkan 2 produk (atau varian) menjadi 1: Satuan ikut Produk Utama, HPP & Stok ikut Produk ke-2"
+                    >
+                      <GitMerge size={13} />
+                      Gabung 2 Produk Jadi 1
+                    </button>
+                  )}
                   <button
                     onClick={handleResetAvgHpp}
                     disabled={selectedWithAvg.length === 0}
@@ -3729,6 +3792,190 @@ export default function PricingHPPPage() {
           </div>
         </div>
       )}
+
+      {/* ===================== MODAL GABUNG 2 PRODUK JADI SATU ===================== */}
+      {showMergeProductsModal && (() => {
+        const primaryProd = products.find(p => p.id === mergePrimaryId);
+        const secondaryProd = products.find(p => p.id === mergeSecondaryId);
+        if (!primaryProd || !secondaryProd) return null;
+
+        const previewStock =
+          mergeStockMode === 'USE_SECONDARY'
+            ? secondaryProd.stock
+            : mergeStockMode === 'SUM'
+            ? primaryProd.stock + secondaryProd.stock
+            : primaryProd.stock;
+        const previewPrice =
+          mergePriceMode === 'USE_SECONDARY' && secondaryProd.priceEcer > 0
+            ? secondaryProd.priceEcer
+            : primaryProd.priceEcer;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white w-full max-w-2xl max-h-[90dvh] overflow-y-auto rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-3 bg-fuchsia-100 text-fuchsia-700 rounded-2xl shrink-0">
+                    <GitMerge size={22} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-900">Gabungkan 2 Produk Jadi Satu</h3>
+                    <p className="text-xs text-slate-500 font-bold mt-0.5">
+                      Satuan &amp; Identitas ikut <strong>Produk Utama</strong>, sedangkan HPP &amp; Stok mengikuti <strong>Produk ke-2</strong>. Mendukung produk reguler maupun varian.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMergeProductsModal(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Perbandingan 2 Produk + Tombol Tukar */}
+              <div className="grid grid-cols-1 md:grid-cols-11 gap-3 items-stretch">
+                {/* Produk Utama */}
+                <div className="md:col-span-5 p-3.5 bg-blue-50/70 border-2 border-blue-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white px-2 py-0.5 rounded-full">
+                      1. Produk Utama (Dipertahankan)
+                    </span>
+                    {primaryProd.isVariant && (
+                      <span className="text-[9px] font-black bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Varian</span>
+                    )}
+                  </div>
+                  <p className="text-xs font-black text-slate-900 leading-snug">{formatProductName(primaryProd.name)}</p>
+                  <div className="text-[11px] text-slate-600 space-y-0.5 font-medium">
+                    <p>Satuan: <strong className="text-blue-800">{primaryProd.units.map(u => `${u.code}${u.contains > 1 ? `×${u.contains}` : ''}`).join(', ')}</strong></p>
+                    <p>HPP Lama: Rp {primaryProd.costPrice.toLocaleString('id-ID')}</p>
+                    <p>Stok Lama: {primaryProd.stock} {primaryProd.unit}</p>
+                    <p>Harga Ecer: Rp {primaryProd.priceEcer.toLocaleString('id-ID')}</p>
+                  </div>
+                </div>
+
+                {/* Tombol Tukar Posisi */}
+                <div className="md:col-span-1 flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMergePrimaryId(mergeSecondaryId);
+                      setMergeSecondaryId(mergePrimaryId);
+                    }}
+                    className="p-2.5 bg-slate-100 hover:bg-fuchsia-100 text-slate-600 hover:text-fuchsia-700 rounded-full border border-slate-200 transition-all shadow-2xs"
+                    title="Tukar posisi Produk Utama & Produk ke-2"
+                  >
+                    <ArrowRightLeft size={16} />
+                  </button>
+                </div>
+
+                {/* Produk ke-2 (Sumber HPP & Stok) */}
+                <div className="md:col-span-5 p-3.5 bg-emerald-50/70 border-2 border-emerald-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                      2. Sumber HPP (Akan Diarsip)
+                    </span>
+                    {secondaryProd.isVariant && (
+                      <span className="text-[9px] font-black bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Varian</span>
+                    )}
+                  </div>
+                  <p className="text-xs font-black text-slate-900 leading-snug">{formatProductName(secondaryProd.name)}</p>
+                  <div className="text-[11px] text-slate-600 space-y-0.5 font-medium">
+                    <p>HPP Baru: <strong className="text-emerald-700">Rp {secondaryProd.costPrice.toLocaleString('id-ID')}</strong></p>
+                    <p>Stok Baru: <strong className="text-emerald-700">{secondaryProd.stock} {secondaryProd.unit}</strong></p>
+                    <p>Harga Ecer: Rp {secondaryProd.priceEcer.toLocaleString('id-ID')}</p>
+                    <p className="text-[10px] text-slate-400">Satuan: {secondaryProd.units.map(u => u.code).join(', ')}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Opsi Stok & Harga Jual */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-slate-600 block">Pengaturan Stok Hasil</label>
+                  <select
+                    value={mergeStockMode}
+                    onChange={e => setMergeStockMode(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                  >
+                    <option value="USE_SECONDARY">Ikuti Stok Produk ke-2 ({secondaryProd.stock}) — Rekomendasi</option>
+                    <option value="SUM">Jumlahkan Stok ({primaryProd.stock} + {secondaryProd.stock} = {primaryProd.stock + secondaryProd.stock})</option>
+                    <option value="KEEP_PRIMARY">Pertahankan Stok Produk Utama ({primaryProd.stock})</option>
+                  </select>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl space-y-1.5">
+                  <label className="text-[10px] font-black uppercase text-slate-600 block">Pengaturan Harga Jual Ecer</label>
+                  <select
+                    value={mergePriceMode}
+                    onChange={e => setMergePriceMode(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                  >
+                    <option value="KEEP_PRIMARY">Ikuti Harga Produk Utama (Rp {primaryProd.priceEcer.toLocaleString('id-ID')})</option>
+                    <option value="USE_SECONDARY">Ikuti Harga Produk ke-2 (Rp {secondaryProd.priceEcer.toLocaleString('id-ID')})</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Ringkasan Hasil Akhir */}
+              <div className="p-3.5 bg-fuchsia-50/70 border border-fuchsia-200 rounded-2xl space-y-1 text-xs">
+                <p className="font-black text-fuchsia-900">Pratinjau Produk Hasil Penggabungan:</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px]">
+                  <div>
+                    <span className="text-slate-500 block">Satuan Dipertahankan</span>
+                    <strong className="text-slate-900">{primaryProd.units.map(u => u.code).join(', ')}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">HPP Akhir (Terkunci)</span>
+                    <strong className="text-emerald-700">Rp {secondaryProd.costPrice.toLocaleString('id-ID')}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Stok Akhir</span>
+                    <strong className="text-blue-700">{previewStock} {primaryProd.unit}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block">Harga Ecer</span>
+                    <strong className="text-slate-900">Rp {previewPrice.toLocaleString('id-ID')}</strong>
+                  </div>
+                </div>
+                <p className="text-[10px] text-fuchsia-700 pt-1">
+                  * Produk ke-2 (&quot;{formatProductName(secondaryProd.name)}&quot;) akan diarsipkan otomatis agar tidak ganda di kasir.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowMergeProductsModal(false)}
+                  disabled={isMergingProducts}
+                  className="px-5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmMergeProducts}
+                  disabled={isMergingProducts}
+                  className="px-6 py-2.5 rounded-2xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white font-black text-xs transition-all flex items-center gap-2 shadow-sm shadow-fuchsia-200 disabled:opacity-60"
+                >
+                  {isMergingProducts ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      Menggabungkan...
+                    </>
+                  ) : (
+                    <>
+                      <GitMerge size={14} />
+                      Gabungkan Jadi 1 Produk
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ===================== MODAL KONFIRMASI KUNCI/BUKA KUNCI SEMUA PRODUK AKTIF ===================== */}
       {showLockAllModal && (
