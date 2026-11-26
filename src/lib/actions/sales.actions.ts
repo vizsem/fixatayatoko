@@ -1,6 +1,6 @@
 'use server'
 
-import { requireStaff } from '@/lib/actions/session';
+import { requireAdmin, requireStaff } from '@/lib/actions/session';
 
 import { deductStockFEFO, addStock } from '../inventory'
 import { revalidatePath } from 'next/cache'
@@ -113,6 +113,12 @@ export async function getSalesOrderById(id: string) {
   }
 }
 
+function generateShortSoNumber(): string {
+  const tsPart = Date.now().toString(36).slice(-4).toUpperCase();
+  const randPart = Math.random().toString(36).slice(2, 4).toUpperCase();
+  return `SO-${tsPart}${randPart}`;
+}
+
 export async function createSalesOrder(data: {
   customerId: string
   createdById: string
@@ -124,7 +130,7 @@ export async function createSalesOrder(data: {
   try {
     const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
     const id = `so_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const soNumber = `SO-${Date.now()}`;
+    const soNumber = generateShortSoNumber();
     const now = new Date().toISOString();
 
     // Rekam Modal per pcs pada saat transaksi supaya laba order ini tidak
@@ -243,7 +249,7 @@ export async function reorderSalesOrder(params: {
 
     // 3. Generate ID & nomor SO baru
     const newId = `so_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const newSoNumber = `SO-${Date.now()}`;
+    const newSoNumber = generateShortSoNumber();
     const now = new Date().toISOString();
 
     // Rekam HPP snapshot agar laba historis tidak berubah jika Modal produk diubah
@@ -700,5 +706,78 @@ async function ambilTarifMarketplace(): Promise<TarifMarketplace> {
   } catch (e: any) {
     console.error('Gagal membaca tarif marketplace dari Settings:', e?.message || e);
     return TARIF_DEFAULT;
+  }
+}
+
+/**
+ * Hapus permanen pesanan yang berstatus DRAFT atau CANCELLED/DIBATALKAN.
+ * Pesanan aktif (CONFIRMED, PICKING, DELIVERING, COMPLETED) tidak diizinkan dihapus langsung
+ * agar jejak stok & laporan keuangan tidak rusak — harus dibatalkan terlebih dahulu.
+ */
+export async function deleteDraftOrCancelledOrders(orderIds: string[]): Promise<{
+  success: boolean;
+  deleted: number;
+  skipped: number;
+  error?: string;
+}> {
+  await requireAdmin();
+  try {
+    const cleanIds = Array.from(new Set((orderIds || []).filter(Boolean)));
+    if (cleanIds.length === 0) {
+      return { success: false, deleted: 0, skipped: 0, error: 'Pilih minimal 1 pesanan' };
+    }
+
+    const { data: rows, error: fetchErr } = await supabaseAdmin
+      .from('orders')
+      .select('id, status')
+      .in('id', cleanIds);
+
+    if (fetchErr) throw fetchErr;
+
+    const deletableIds: string[] = [];
+    let skipped = 0;
+
+    for (const row of rows || []) {
+      const status = String(row.status || '').toUpperCase();
+      if (status === 'DRAFT' || status === 'CANCELLED' || status === 'DIBATALKAN') {
+        deletableIds.push(row.id);
+      } else {
+        skipped++;
+      }
+    }
+
+    if (deletableIds.length === 0) {
+      return {
+        success: false,
+        deleted: 0,
+        skipped,
+        error: 'Hanya pesanan berstatus Draf atau Dibatalkan yang dapat dihapus permanen. Batalkan pesanan terlebih dahulu.',
+      };
+    }
+
+    const { error: delErr } = await supabaseAdmin
+      .from('orders')
+      .delete()
+      .in('id', deletableIds);
+
+    if (delErr) throw delErr;
+
+    revalidatePath('/admin/orders');
+    revalidatePath('/admin/reports/finance');
+    revalidatePath('/admin/reports/sales');
+
+    return {
+      success: true,
+      deleted: deletableIds.length,
+      skipped,
+    };
+  } catch (error: any) {
+    console.error('deleteDraftOrCancelledOrders error:', error);
+    return {
+      success: false,
+      deleted: 0,
+      skipped: 0,
+      error: error?.message || 'Gagal menghapus pesanan',
+    };
   }
 }

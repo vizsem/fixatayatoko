@@ -14,7 +14,7 @@ import Link from 'next/link';
 import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
-import { getSalesOrders, updateSalesOrderStatus, cancelSalesOrder, reorderSalesOrder } from '@/lib/actions/sales.actions';
+import { getSalesOrders, updateSalesOrderStatus, cancelSalesOrder, reorderSalesOrder, deleteDraftOrCancelledOrders } from '@/lib/actions/sales.actions';
 
 type Order = {
   id: string;
@@ -58,6 +58,41 @@ export default function AdminOrders() {
   const [reorderSource, setReorderSource] = useState<Order | null>(null);
   const [reorderQty, setReorderQty] = useState<Record<string, number>>({});
   const [isReordering, setIsReordering] = useState(false);
+
+  // State Modal Hapus Permanen (khusus DRAFT / CANCELLED)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deleteTargetIds, setDeleteTargetIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isOrderDeletable = (status: string) => {
+    const s = String(status || '').toUpperCase();
+    return s === 'DRAFT' || s === 'CANCELLED' || s === 'DIBATALKAN';
+  };
+
+  const deletableSelectedIds = selectedOrders.filter(id => {
+    const ord = orders.find(o => o.id === id);
+    return ord ? isOrderDeletable(ord.status) : false;
+  });
+
+  const handleConfirmDelete = async () => {
+    if (deleteTargetIds.length === 0 || isDeleting) return;
+    setIsDeleting(true);
+    const t = notify.admin.loading(`Menghapus ${deleteTargetIds.length} pesanan...`);
+    const result = await deleteDraftOrCancelledOrders(deleteTargetIds);
+    notify.dismiss(t);
+    setIsDeleting(false);
+    if (result.success) {
+      setIsDeleteModalOpen(false);
+      setQuickViewOrder(null);
+      setSelectedOrders(prev => prev.filter(id => !deleteTargetIds.includes(id)));
+      setDeleteTargetIds([]);
+      const skipMsg = result.skipped > 0 ? ` (${result.skipped} pesanan aktif dilewati)` : '';
+      notify.admin.success(`${result.deleted} pesanan berhasil dihapus permanen${skipMsg}`);
+      loadOrders();
+    } else {
+      notify.admin.error(result.error || 'Gagal menghapus pesanan');
+    }
+  };
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
@@ -163,11 +198,31 @@ export default function AdminOrders() {
     loadOrders();
   };
 
+  const formatShortOrderNo = (rawNo: string) => {
+    const clean = String(rawNo || '').trim();
+    if (!clean) return '-';
+    // Jika format panjang seperti SO-1795625399892 atau ORD-1795625399892 -> ambil prefix + 6 karakter terakhir
+    const match = clean.match(/^([A-Z]+)-(\d{9,})$/i);
+    if (match) {
+      return `${match[1].toUpperCase()}-${match[2].slice(-6)}`;
+    }
+    if (clean.length > 14) {
+      const parts = clean.split('-');
+      if (parts.length > 1) {
+        return `${parts[0]}-${parts[parts.length - 1].slice(-6)}`;
+      }
+      return `#${clean.slice(-6)}`;
+    }
+    return clean;
+  };
+
   const filteredOrders = orders.filter(order => {
     const q = searchTerm.trim().toLowerCase();
+    const shortNo = formatShortOrderNo(order.soNumber || '').toLowerCase();
     const matchesSearch =
       !q ||
       (order.soNumber || '').toLowerCase().includes(q) ||
+      shortNo.includes(q) ||
       (order.customer?.name || '').toLowerCase().includes(q);
     const matchesTab =
       activeTab === 'SEMUA' ||
@@ -397,8 +452,9 @@ export default function AdminOrders() {
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setQuickViewOrder(order); }}
                           className="font-mono font-bold text-xs text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg hover:bg-blue-100 transition-colors"
+                          title={`Nomor Lengkap: ${order.soNumber}`}
                         >
-                          {order.soNumber}
+                          {formatShortOrderNo(order.soNumber)}
                         </button>
                         <span className={`text-[11px] px-2.5 py-0.5 rounded-lg font-semibold border ${getStatusColor(order.status)}`}>
                           {getStatusLabel(order.status)}
@@ -553,6 +609,22 @@ export default function AdminOrders() {
               <Ban size={14} />
               <span>Batalkan</span>
             </button>
+
+            {/* Tombol Hapus Permanen (khusus Draf / Dibatalkan) */}
+            {deletableSelectedIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDeleteTargetIds(deletableSelectedIds);
+                  setIsDeleteModalOpen(true);
+                }}
+                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600/90 hover:bg-rose-600 text-white transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                title={`Hapus permanen ${deletableSelectedIds.length} pesanan berstatus Draf / Dibatalkan`}
+              >
+                <Trash2 size={14} />
+                <span>Hapus ({deletableSelectedIds.length})</span>
+              </button>
+            )}
 
             <div className="h-5 w-px bg-slate-800 hidden sm:block" />
 
@@ -820,8 +892,11 @@ export default function AdminOrders() {
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono font-bold text-sm text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg">
-                      {quickViewOrder.soNumber}
+                    <span
+                      className="font-mono font-bold text-sm text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg"
+                      title={`Nomor Lengkap: ${quickViewOrder.soNumber}`}
+                    >
+                      {formatShortOrderNo(quickViewOrder.soNumber)}
                     </span>
                     <span className={`text-xs px-2.5 py-0.5 rounded-lg font-semibold border ${getStatusColor(quickViewOrder.status)}`}>
                       {getStatusLabel(quickViewOrder.status)}
@@ -975,6 +1050,20 @@ export default function AdminOrders() {
                   <RotateCcw size={14} />
                   <span>Pesan Ulang</span>
                 </button>
+                {/* Tombol Hapus Permanen — khusus Draf / Dibatalkan */}
+                {isOrderDeletable(quickViewOrder.status) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteTargetIds([quickViewOrder.id]);
+                      setIsDeleteModalOpen(true);
+                    }}
+                    className="px-3.5 py-2.5 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                  >
+                    <Trash2 size={14} />
+                    <span>Hapus Permanen</span>
+                  </button>
+                )}
               </div>
 
               <button
@@ -995,6 +1084,62 @@ export default function AdminOrders() {
                   <>
                     <span>Buka Halaman Lengkap</span>
                     <ExternalLink size={14} />
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Konfirmasi Hapus Permanen (khusus Draf / Dibatalkan) */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-[130] bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mb-4">
+              <Trash2 size={24} />
+            </div>
+
+            <h3 className="text-lg font-extrabold text-slate-900 tracking-tight">
+              Hapus Permanen {deleteTargetIds.length} Pesanan?
+            </h3>
+            <p className="text-xs text-slate-600 font-medium leading-relaxed mt-1.5 mb-4">
+              Data pesanan berstatus <strong>Draf</strong> atau <strong>Dibatalkan</strong> ini akan dihapus permanen dari daftar dan database. Tindakan ini tidak dapat dibatalkan.
+            </p>
+
+            {selectedOrders.length > deleteTargetIds.length && (
+              <div className="mb-5 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 font-medium">
+                <strong>{selectedOrders.length - deleteTargetIds.length} pesanan aktif</strong> yang ikut tercentang akan otomatis dilewati demi keamanan stok &amp; laporan.
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setDeleteTargetIds([]);
+                }}
+                disabled={isDeleting}
+                className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-rose-200 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Menghapus...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={14} />
+                    <span>Ya, Hapus Permanen</span>
                   </>
                 )}
               </button>
