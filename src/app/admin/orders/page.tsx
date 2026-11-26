@@ -31,15 +31,18 @@ type Order = {
   invoice: { status: string; amountPaid: number } | null;
 };
 
+type OrderTab = 'SEMUA' | 'CONFIRMED' | 'PICKING' | 'DELIVERING' | 'COMPLETED' | 'DRAFT' | 'CANCELLED';
+
 export default function AdminOrders() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'SEMUA' | 'DRAFT' | 'CONFIRMED' | 'DELIVERING' | 'COMPLETED'>('SEMUA');
+  const [activeTab, setActiveTab] = useState<OrderTab>('SEMUA');
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [printMenuOpen, setPrintMenuOpen] = useState<string | null>(null);
+  const [bulkPrintMenuOpen, setBulkPrintMenuOpen] = useState(false);
   const [quickViewOrder, setQuickViewOrder] = useState<Order | null>(null);
   const [navigatingId, setNavigatingId] = useState<string | null>(null);
   const itemsPerPage = 15;
@@ -161,212 +164,378 @@ export default function AdminOrders() {
   };
 
   const filteredOrders = orders.filter(order => {
+    const q = searchTerm.trim().toLowerCase();
     const matchesSearch =
-      (order.soNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (order.customer?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTab = activeTab === 'SEMUA' || order.status === activeTab;
+      !q ||
+      (order.soNumber || '').toLowerCase().includes(q) ||
+      (order.customer?.name || '').toLowerCase().includes(q);
+    const matchesTab =
+      activeTab === 'SEMUA' ||
+      (activeTab === 'PICKING' ? ['PICKING', 'PACKING'].includes(order.status) : order.status === activeTab);
     return matchesSearch && matchesTab;
   });
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
   const currentItems = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const isAllCurrentSelected = currentItems.length > 0 && currentItems.every(o => selectedOrders.includes(o.id));
 
   const handleSelectAll = () => {
     const ids = currentItems.map(o => o.id);
-    const allSelected = ids.every(id => selectedOrders.includes(id));
-    if (allSelected) setSelectedOrders(prev => prev.filter(id => !ids.includes(id)));
+    if (isAllCurrentSelected) setSelectedOrders(prev => prev.filter(id => !ids.includes(id)));
     else setSelectedOrders(prev => [...new Set([...prev, ...ids])]);
   };
 
   const getStatusColor = (status: string) => {
     switch (status.toUpperCase()) {
-      case 'DRAFT': return 'bg-slate-50 text-slate-500 border-slate-100';
-      case 'CONFIRMED': return 'bg-rose-50 text-rose-600 border-rose-100';
-      case 'PICKING': case 'PACKING': return 'bg-amber-50 text-amber-600 border-amber-100';
-      case 'DELIVERING': return 'bg-blue-50 text-blue-600 border-blue-100';
-      case 'COMPLETED': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-      case 'CANCELLED': return 'bg-slate-50 text-slate-400 border-slate-100';
-      default: return 'bg-slate-50 text-slate-400 border-slate-100';
+      case 'DRAFT': return 'bg-slate-100 text-slate-600 border-slate-200';
+      case 'CONFIRMED': return 'bg-rose-50 text-rose-700 border-rose-200';
+      case 'PICKING': case 'PACKING': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'DELIVERING': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'COMPLETED': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'CANCELLED': return 'bg-slate-100 text-slate-500 border-slate-200';
+      default: return 'bg-slate-100 text-slate-500 border-slate-200';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'DRAFT': return 'Draf';
+      case 'CONFIRMED': return 'Menunggu';
+      case 'PICKING':
+      case 'PACKING': return 'Diproses';
+      case 'DELIVERING': return 'Dikirim';
+      case 'COMPLETED': return 'Selesai';
+      case 'CANCELLED': return 'Dibatalkan';
+      default: return status;
     }
   };
 
   const statusCounts = {
+    ALL: orders.length,
     CONFIRMED: orders.filter(o => o.status === 'CONFIRMED').length,
     PICKING: orders.filter(o => ['PICKING', 'PACKING'].includes(o.status)).length,
     DELIVERING: orders.filter(o => o.status === 'DELIVERING').length,
     COMPLETED: orders.filter(o => o.status === 'COMPLETED').length,
+    DRAFT: orders.filter(o => o.status === 'DRAFT').length,
+    CANCELLED: orders.filter(o => o.status === 'CANCELLED').length,
   };
 
   return (
-    <div className="bg-[#F8FAFC] p-3 md:p-6">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8 pb-28">
       <Toaster position="top-right" />
+      <div className="max-w-7xl mx-auto">
 
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Orders Pipeline</h1>
-          <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.2em] mt-1">Transaction flow management · PostgreSQL</p>
-        </div>
-        <button onClick={loadOrders} className="px-4 py-2.5 bg-white border border-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2">
-          <RefreshCcw size={14} /> Refresh
-        </button>
-      </div>
-
-      <div className="grid grid-cols-4 gap-2 md:gap-4 mb-6">
-        {[
-          { label: 'Pending', count: statusCounts.CONFIRMED, color: 'text-rose-600' },
-          { label: 'Processing', count: statusCounts.PICKING, color: 'text-amber-600' },
-          { label: 'Shipping', count: statusCounts.DELIVERING, color: 'text-blue-600' },
-          { label: 'Finished', count: statusCounts.COMPLETED, color: 'text-emerald-600' },
-        ].map(stat => (
-          <div key={stat.label} className="bg-white p-2 md:p-4 rounded-2xl md:rounded-3xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center">
-            <span className={`text-lg md:text-2xl font-black ${stat.color}`}>{stat.count}</span>
-            <span className="text-xs md:text-xs font-black uppercase text-slate-400 tracking-wider md:tracking-widest mt-0.5 md:mt-1 text-center select-none">{stat.label}</span>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight">
+              Manajemen Pesanan
+            </h1>
+            <p className="text-slate-500 text-xs md:text-sm font-medium mt-1">
+              Pantau alur pesanan, pengemasan, pengiriman, dan pencetakan faktur secara real-time.
+            </p>
           </div>
-        ))}
-      </div>
+          <button
+            onClick={loadOrders}
+            disabled={loading}
+            className="self-start sm:self-auto px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-2xl font-semibold text-xs shadow-xs hover:bg-slate-50 hover:border-slate-300 transition-all flex items-center gap-2 disabled:opacity-60"
+          >
+            <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
+            <span>Muat Ulang</span>
+          </button>
+        </div>
 
-      <div className="bg-white p-2 rounded-[2rem] shadow-sm border border-slate-100 mb-6 flex flex-col lg:flex-row items-center gap-2">
-        <div className="relative w-full lg:max-w-[240px]">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
-          <input
-            id="order-search"
-            type="text"
-            placeholder="Search orders..."
-            className="w-full pl-10 pr-4 py-3 bg-slate-50 rounded-2xl text-xs font-bold outline-none"
-            value={searchTerm}
-            onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-          />
+        {/* KPI Pipeline Cards (Interaktif & Responsif) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+          {[
+            { tab: 'CONFIRMED' as OrderTab, label: 'Menunggu', sub: 'Perlu diproses', count: statusCounts.CONFIRMED, color: 'text-rose-600', ring: 'ring-rose-500/20 border-rose-300 bg-rose-50/30' },
+            { tab: 'PICKING' as OrderTab, label: 'Diproses', sub: 'Sedang dikemas', count: statusCounts.PICKING, color: 'text-amber-600', ring: 'ring-amber-500/20 border-amber-300 bg-amber-50/30' },
+            { tab: 'DELIVERING' as OrderTab, label: 'Dikirim', sub: 'Dalam perjalanan', count: statusCounts.DELIVERING, color: 'text-blue-600', ring: 'ring-blue-500/20 border-blue-300 bg-blue-50/30' },
+            { tab: 'COMPLETED' as OrderTab, label: 'Selesai', sub: 'Terkirim & tuntas', count: statusCounts.COMPLETED, color: 'text-emerald-600', ring: 'ring-emerald-500/20 border-emerald-300 bg-emerald-50/30' },
+          ].map(stat => {
+            const isActive = activeTab === stat.tab;
+            return (
+              <button
+                key={stat.tab}
+                type="button"
+                onClick={() => {
+                  setActiveTab(isActive ? 'SEMUA' : stat.tab);
+                  setCurrentPage(1);
+                }}
+                className={`text-left p-4 rounded-2xl md:rounded-3xl border shadow-xs transition-all hover:shadow-sm ${
+                  isActive
+                    ? `ring-2 ${stat.ring}`
+                    : 'bg-white border-slate-200/80 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-slate-600">{stat.label}</span>
+                  {isActive && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-white text-slate-700 border border-slate-200">
+                      Filter Aktif
+                    </span>
+                  )}
+                </div>
+                <p className={`text-2xl md:text-3xl font-extrabold tabular-nums tracking-tight mt-1.5 ${stat.color}`}>
+                  {stat.count}
+                </p>
+                <p className="text-[11px] text-slate-400 font-medium mt-0.5">{stat.sub}</p>
+              </button>
+            );
+          })}
         </div>
-        <div className="flex flex-1 gap-1 overflow-x-auto w-full no-scrollbar px-1">
-          {['SEMUA', 'DRAFT', 'CONFIRMED', 'DELIVERING', 'COMPLETED'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => { setActiveTab(tab as any); setCurrentPage(1); }}
-              className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-tight transition-all whitespace-nowrap ${activeTab === tab ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-        <button onClick={handleSelectAll} className="p-3 bg-slate-900 text-white rounded-xl shadow-md">
-          <CheckCircle2 size={16} />
-        </button>
-      </div>
 
-      {loading ? (
-        <TableSkeleton rows={8} />
-      ) : filteredOrders.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-100 p-16 text-center">
-          <ShoppingCart className="mx-auto text-slate-200 mb-4" size={48} />
-          <p className="text-slate-400 font-bold">Belum ada pesanan</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-3">
-          {currentItems.map(order => (
-            <div key={order.id} className={`bg-white rounded-[1.5rem] p-4 border transition-all ${selectedOrders.includes(order.id) ? 'border-slate-900 ring-4 ring-slate-50' : 'border-slate-100 hover:border-slate-200'}`}>
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                <button onClick={() => setSelectedOrders(prev => prev.includes(order.id) ? prev.filter(i => i !== order.id) : [...prev, order.id])} className="text-slate-200">
-                  {selectedOrders.includes(order.id) ? <CheckSquare size={20} className="text-slate-900" /> : <Square size={20} />}
+        {/* Filter & Search Bar */}
+        <div className="bg-white p-2.5 rounded-2xl md:rounded-3xl shadow-xs border border-slate-200/80 mb-6 flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+          <div className="relative w-full lg:w-72 shrink-0">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+            <input
+              id="order-search"
+              type="text"
+              placeholder="Cari nomor SO atau nama pelanggan..."
+              className="w-full pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200/70 rounded-xl text-xs font-medium text-slate-800 placeholder:text-slate-400 outline-none focus:bg-white focus:border-slate-400 transition-all"
+              value={searchTerm}
+              onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 rounded-md"
+                title="Hapus pencarian"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-1 gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+            {([
+              { key: 'SEMUA', label: 'Semua', count: statusCounts.ALL },
+              { key: 'CONFIRMED', label: 'Menunggu', count: statusCounts.CONFIRMED },
+              { key: 'PICKING', label: 'Diproses', count: statusCounts.PICKING },
+              { key: 'DELIVERING', label: 'Dikirim', count: statusCounts.DELIVERING },
+              { key: 'COMPLETED', label: 'Selesai', count: statusCounts.COMPLETED },
+              { key: 'DRAFT', label: 'Draf', count: statusCounts.DRAFT },
+              { key: 'CANCELLED', label: 'Dibatalkan', count: statusCounts.CANCELLED },
+            ] as { key: OrderTab; label: string; count: number }[]).map(tab => {
+              const active = activeTab === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => { setActiveTab(tab.key); setCurrentPage(1); }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                    active
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-md ${
+                    active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {tab.count}
+                  </span>
                 </button>
+              );
+            })}
+          </div>
 
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setQuickViewOrder(order)}>
-                  <div className="flex items-center gap-2 mb-1">
+          <button
+            type="button"
+            onClick={handleSelectAll}
+            disabled={currentItems.length === 0}
+            className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 border ${
+              isAllCurrentSelected
+                ? 'bg-slate-900 text-white border-slate-900'
+                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+            } disabled:opacity-40`}
+            title="Pilih semua pesanan di halaman ini"
+          >
+            {isAllCurrentSelected ? <CheckSquare size={15} /> : <Square size={15} />}
+            <span>{isAllCurrentSelected ? 'Batal Pilih' : 'Pilih Semua'}</span>
+          </button>
+        </div>
+
+        {/* Orders List */}
+        {loading ? (
+          <TableSkeleton rows={8} />
+        ) : filteredOrders.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-16 text-center shadow-xs">
+            <ShoppingCart className="mx-auto text-slate-300 mb-3" size={44} />
+            <p className="text-slate-700 font-bold text-sm">Belum ada pesanan yang sesuai</p>
+            <p className="text-slate-400 text-xs mt-1">Ubah kata kunci pencarian atau pilih tab status lainnya.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3">
+            {currentItems.map(order => {
+              const isSelected = selectedOrders.includes(order.id);
+              const isPaid = order.invoice?.status === 'PAID';
+              return (
+                <div
+                  key={order.id}
+                  className={`bg-white rounded-2xl p-4 border transition-all ${
+                    isSelected
+                      ? 'border-slate-900 ring-2 ring-slate-900/10 shadow-sm'
+                      : 'border-slate-200/80 hover:border-slate-300 shadow-2xs'
+                  }`}
+                >
+                  <div className="flex flex-col md:flex-row items-start md:items-center gap-3.5 md:gap-4">
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); setQuickViewOrder(order); }}
-                      className="font-black text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg hover:bg-blue-100 transition-colors text-left"
+                      onClick={() => setSelectedOrders(prev => prev.includes(order.id) ? prev.filter(i => i !== order.id) : [...prev, order.id])}
+                      className="text-slate-300 hover:text-slate-600 transition-colors pt-0.5 md:pt-0 shrink-0"
+                      aria-label={`Pilih pesanan ${order.soNumber}`}
                     >
-                      {order.soNumber}
+                      {isSelected ? <CheckSquare size={20} className="text-slate-900" /> : <Square size={20} />}
                     </button>
-                    <span className={`text-xs px-2 py-0.5 rounded-lg font-black uppercase border ${getStatusColor(order.status)}`}>{order.status}</span>
-                    {order.invoice && (
-                      <span className={`text-xs px-2 py-0.5 rounded-lg font-black uppercase border ${order.invoice.status === 'PAID' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'}`}>
-                        {order.invoice.status}
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-black text-slate-800 text-sm uppercase truncate hover:text-blue-600 transition-colors">{order.customer?.name || 'Walk-in Customer'}</h3>
-                  <div className="flex items-center gap-3 text-xs font-bold text-slate-400 mt-1">
-                    <span className="flex items-center gap-1"><Calendar size={12} /> {new Date(order.createdAt).toLocaleDateString('id-ID')}</span>
-                    <span className="flex items-center gap-1"><Clock size={12} /> {new Date(order.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</span>
-                    <span className="flex items-center gap-1"><LayoutDashboard size={12} /> {order.items.length} item</span>
-                  </div>
-                </div>
 
-                <div className="flex flex-col md:items-end md:text-right cursor-pointer" onClick={() => setQuickViewOrder(order)}>
-                  <p className="text-xs font-black text-slate-300 uppercase tracking-widest leading-none">Total</p>
-                  <p className="text-lg font-black text-slate-900 leading-tight">Rp {order.totalAmount.toLocaleString('id-ID')}</p>
-                </div>
-
-                <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0 pt-3 md:pt-0 border-t md:border-none border-slate-50">
-                  <button
-                    type="button"
-                    onClick={() => setQuickViewOrder(order)}
-                    className="flex-1 md:flex-none px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black uppercase tracking-widest text-center flex items-center justify-center gap-1.5 transition-all active:scale-95"
-                  >
-                    <Eye size={14} /> Detail
-                  </button>
-                  {/* Print split-button */}
-                  <div className="relative">
-                    <button
-                      onClick={() => setPrintMenuOpen(printMenuOpen === order.id ? null : order.id)}
-                      className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:text-slate-900 hover:bg-slate-100 transition-all"
-                      title="Pilih format cetak"
-                    >
-                      <Printer size={16} />
-                    </button>
-                    {printMenuOpen === order.id && (
-                      <div className="absolute right-0 bottom-full mb-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden w-44">
-                        <div className="px-3 py-2 border-b border-slate-50">
-                          <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Format Cetak</p>
-                        </div>
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setQuickViewOrder(order)}>
+                      <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                         <button
-                          onClick={() => { handlePrint(order.id, 'a4'); setPrintMenuOpen(null); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left"
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setQuickViewOrder(order); }}
+                          className="font-mono font-bold text-xs text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg hover:bg-blue-100 transition-colors"
                         >
-                          <FileText size={15} className="text-blue-500" />
-                          <div>
-                            <p className="text-xs font-black">Invoice A4</p>
-                            <p className="text-xs text-slate-400 font-normal">Profesional, A4</p>
-                          </div>
+                          {order.soNumber}
                         </button>
-                        <button
-                          onClick={() => { handlePrint(order.id, 'thermal'); setPrintMenuOpen(null); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors text-left"
-                        >
-                          <Receipt size={15} className="text-slate-500" />
-                          <div>
-                            <p className="text-xs font-black">Struk Thermal</p>
-                            <p className="text-xs text-slate-400 font-normal">58mm / 80mm</p>
-                          </div>
-                        </button>
+                        <span className={`text-[11px] px-2.5 py-0.5 rounded-lg font-semibold border ${getStatusColor(order.status)}`}>
+                          {getStatusLabel(order.status)}
+                        </span>
+                        {order.invoice && (
+                          <span className={`text-[11px] px-2.5 py-0.5 rounded-lg font-semibold border ${
+                            isPaid
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-rose-50 text-rose-700 border-rose-200'
+                          }`}>
+                            {isPaid ? 'Lunas' : 'Belum Lunas'}
+                          </span>
+                        )}
                       </div>
-                    )}
+                      <h3 className="font-bold text-slate-900 text-sm md:text-[15px] truncate hover:text-blue-600 transition-colors">
+                        {order.customer?.name || 'Pelanggan Umum (Walk-in)'}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-slate-500 mt-1">
+                        <span className="flex items-center gap-1.5">
+                          <Calendar size={13} className="text-slate-400" />
+                          {new Date(order.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </span>
+                        <span className="flex items-center gap-1.5 tabular-nums">
+                          <Clock size={13} className="text-slate-400" />
+                          {new Date(order.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
+                        </span>
+                        <span className="flex items-center gap-1.5 tabular-nums">
+                          <Package size={13} className="text-slate-400" />
+                          {order.items.length} jenis barang
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between w-full md:w-auto gap-4 pt-3 md:pt-0 border-t md:border-none border-slate-100">
+                      <div className="flex flex-col md:items-end md:text-right cursor-pointer" onClick={() => setQuickViewOrder(order)}>
+                        <p className="text-[11px] font-semibold text-slate-500">Total Tagihan</p>
+                        <p className="text-base md:text-lg font-extrabold tabular-nums text-slate-900 leading-tight mt-0.5">
+                          Rp {order.totalAmount.toLocaleString('id-ID')}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setQuickViewOrder(order)}
+                          className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                        >
+                          <Eye size={14} />
+                          <span>Detail</span>
+                        </button>
+                        {/* Print split-button */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setPrintMenuOpen(printMenuOpen === order.id ? null : order.id)}
+                            className="p-2.5 bg-slate-50 border border-slate-200 text-slate-600 rounded-xl hover:text-slate-900 hover:bg-slate-100 transition-all"
+                            title="Pilih format cetak"
+                          >
+                            <Printer size={16} />
+                          </button>
+                          {printMenuOpen === order.id && (
+                            <div className="absolute right-0 bottom-full mb-2 z-50 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden w-44">
+                              <div className="px-3.5 py-2 border-b border-slate-100 bg-slate-50/70">
+                                <p className="text-[11px] font-bold text-slate-500">Format Cetak</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => { handlePrint(order.id, 'a4'); setPrintMenuOpen(null); }}
+                                className="w-full flex items-center gap-3 px-3.5 py-2.5 text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left"
+                              >
+                                <FileText size={15} className="text-blue-600 shrink-0" />
+                                <div>
+                                  <p className="text-xs font-bold">Invoice A4</p>
+                                  <p className="text-[11px] text-slate-400">Faktur standar A4</p>
+                                </div>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { handlePrint(order.id, 'thermal'); setPrintMenuOpen(null); }}
+                                className="w-full flex items-center gap-3 px-3.5 py-2.5 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors text-left"
+                              >
+                                <Receipt size={15} className="text-slate-500 shrink-0" />
+                                <div>
+                                  <p className="text-xs font-bold">Struk Thermal</p>
+                                  <p className="text-[11px] text-slate-400">Ukuran 58mm / 80mm</p>
+                                </div>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
 
-      {totalPages > 1 && (
-        <div className="mt-8 flex justify-center gap-2">
-          <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="p-3 bg-white border border-slate-100 rounded-xl"><ChevronLeft size={16} /></button>
-          <span className="flex items-center px-4 text-xs font-black text-slate-400">PAGE {currentPage} / {totalPages}</span>
-          <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="p-3 bg-white border border-slate-100 rounded-xl"><ChevronRight size={16} /></button>
-        </div>
-      )}
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-8 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all"
+            >
+              <ChevronLeft size={15} />
+              <span className="hidden sm:inline">Sebelumnya</span>
+            </button>
+            <span className="px-4 py-2 text-xs font-semibold tabular-nums text-slate-600">
+              Halaman {currentPage} dari {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-all"
+            >
+              <span className="hidden sm:inline">Berikutnya</span>
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        )}
+      </div>
 
-      {/* Floating Action Bar Proporsional & Modern */}
+      {/* Floating Action Bar Proporsional & Touch-Friendly */}
       {selectedOrders.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] max-w-[95vw] animate-in slide-in-from-bottom-6 duration-200">
           <div className="bg-slate-950/95 backdrop-blur-xl border border-slate-800 shadow-2xl rounded-2xl p-1.5 md:p-2 flex items-center gap-1.5 md:gap-2.5 text-white">
             {/* Counter & Clear Selection */}
-            <div className="flex items-center gap-2 pl-3 pr-2 py-1.5 bg-white/10 rounded-xl text-xs font-bold text-slate-200 whitespace-nowrap">
+            <div className="flex items-center gap-2 pl-3 pr-2 py-1.5 bg-white/10 rounded-xl text-xs font-semibold text-slate-200 whitespace-nowrap tabular-nums">
               <span>{selectedOrders.length} Dipilih</span>
               <button
-                onClick={() => setSelectedOrders([])}
+                type="button"
+                onClick={() => { setSelectedOrders([]); setBulkPrintMenuOpen(false); }}
                 className="text-slate-400 hover:text-white p-0.5 rounded-lg transition-colors"
                 title="Batal pilih semua"
               >
@@ -374,72 +543,78 @@ export default function AdminOrders() {
               </button>
             </div>
 
-            {/* Tombol Cancel / Batal (Aksi Destruktif yang Aman) */}
+            {/* Tombol Cancel / Batal */}
             <button
+              type="button"
               onClick={() => setIsCancelModalOpen(true)}
-              className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+              className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
               title="Batalkan pesanan dan kembalikan stok"
             >
               <Ban size={14} />
               <span>Batalkan</span>
             </button>
 
-            {/* Divider Halus */}
             <div className="h-5 w-px bg-slate-800 hidden sm:block" />
 
-            {/* Cetak Masal */}
-            <div className="relative group">
+            {/* Cetak Masal (Click-based agar ramah layar sentuh) */}
+            <div className="relative">
               <button
-                onClick={() => handleBulkPrint('a4')}
-                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800/90 hover:bg-violet-600 hover:text-white transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
-                title="Cetak semua pesanan terpilih (A4)"
+                type="button"
+                onClick={() => setBulkPrintMenuOpen(prev => !prev)}
+                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-violet-600 hover:text-white transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                title="Cetak semua pesanan terpilih"
               >
                 <Printer size={14} className="text-violet-400" />
                 <span className="hidden sm:inline">Cetak</span>
               </button>
-              {/* Dropdown format cetak */}
-              <div className="absolute bottom-full mb-2 left-0 hidden group-hover:flex flex-col bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden w-36 z-50">
-                <button
-                  onClick={() => handleBulkPrint('a4')}
-                  className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold text-slate-200 hover:bg-violet-600 hover:text-white transition-colors"
-                >
-                  <FileText size={13} /> Invoice A4
-                </button>
-                <button
-                  onClick={() => handleBulkPrint('thermal')}
-                  className="flex items-center gap-2 px-3 py-2.5 text-xs font-bold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
-                >
-                  <Receipt size={13} /> Struk Thermal
-                </button>
-              </div>
+              {bulkPrintMenuOpen && (
+                <div className="absolute bottom-full mb-2 left-0 flex flex-col bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden w-40 z-50">
+                  <button
+                    type="button"
+                    onClick={() => { setBulkPrintMenuOpen(false); handleBulkPrint('a4'); }}
+                    className="flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold text-slate-200 hover:bg-violet-600 hover:text-white transition-colors text-left"
+                  >
+                    <FileText size={13} /> Invoice A4
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setBulkPrintMenuOpen(false); handleBulkPrint('thermal'); }}
+                    className="flex items-center gap-2 px-3.5 py-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                  >
+                    <Receipt size={13} /> Struk Thermal
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Divider Halus */}
             <div className="h-5 w-px bg-slate-800 hidden sm:block" />
 
             {/* Operational Pipeline Actions */}
             <div className="flex items-center gap-1">
               <button
+                type="button"
                 onClick={() => handleBulkUpdate('PICKING')}
-                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800/90 hover:bg-amber-500 hover:text-slate-950 transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
-                title="Ubah status ke Proses (Picking/Packing)"
+                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-amber-500 hover:text-slate-950 transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                title="Ubah status ke Diproses (Picking/Packing)"
               >
                 <Package size={14} className="text-amber-400" />
                 <span className="hidden sm:inline">Proses</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => handleBulkUpdate('DELIVERING')}
-                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800/90 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
-                title="Ubah status ke Pengiriman (Delivering)"
+                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-blue-600 hover:text-white transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                title="Ubah status ke Dikirim (Delivering)"
               >
                 <Truck size={14} className="text-blue-400" />
                 <span className="hidden sm:inline">Kirim</span>
               </button>
 
               <button
+                type="button"
                 onClick={() => handleBulkUpdate('COMPLETED')}
-                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800/90 hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                className="px-3 md:px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-emerald-600 hover:text-white transition-all flex items-center gap-1.5 whitespace-nowrap active:scale-95"
                 title="Selesaikan pesanan (Completed)"
               >
                 <CheckCircle2 size={14} className="text-emerald-400" />
@@ -644,16 +819,16 @@ export default function AdminOrders() {
                   <Receipt size={22} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-black text-sm text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-lg">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono font-bold text-sm text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg">
                       {quickViewOrder.soNumber}
                     </span>
-                    <span className={`text-xs px-2.5 py-0.5 rounded-lg font-black uppercase border ${getStatusColor(quickViewOrder.status)}`}>
-                      {quickViewOrder.status}
+                    <span className={`text-xs px-2.5 py-0.5 rounded-lg font-semibold border ${getStatusColor(quickViewOrder.status)}`}>
+                      {getStatusLabel(quickViewOrder.status)}
                     </span>
                     {quickViewOrder.invoice && (
-                      <span className={`text-xs px-2.5 py-0.5 rounded-lg font-black uppercase border ${quickViewOrder.invoice.status === 'PAID' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-500 border-rose-100'}`}>
-                        {quickViewOrder.invoice.status}
+                      <span className={`text-xs px-2.5 py-0.5 rounded-lg font-semibold border ${quickViewOrder.invoice.status === 'PAID' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                        {quickViewOrder.invoice.status === 'PAID' ? 'Lunas' : 'Belum Lunas'}
                       </span>
                     )}
                   </div>
