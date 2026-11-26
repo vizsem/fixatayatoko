@@ -200,19 +200,22 @@ export default function MarketplaceOrdersPage() {
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('id, name, price, stock, unit, raw_data, image_url, is_active')
+        .select('id, name, sku, price, stock, unit, raw_data, image_url, is_active')
         .eq('is_active', true)
         .order('name');
       if (error) throw error;
       setProducts((data || []).map((d: any) => {
         const raw = d.raw_data || {};
+        const thumb = d.image_url || raw.imageUrl || raw.image || raw.Link_Foto || '';
         return {
           id: d.id,
+          sku: d.sku || raw.sku || '',
           name: d.name || raw.name || raw.Nama || '',
           price: Number(d.price ?? raw.price ?? raw.Ecer ?? 0),
           stock: Number(d.stock ?? raw.stock ?? raw.Stok ?? 0),
           unit: d.unit || raw.unit || raw.Satuan || 'PCS',
-          image: d.image_url || raw.image || raw.Link_Foto || '',
+          image: thumb,
+          imageUrl: thumb,
           units: raw.units || [],
           channelPricing: raw.channelPricing || {},
           priceShopee: raw.priceShopee || 0,
@@ -472,207 +475,262 @@ export default function MarketplaceOrdersPage() {
   };
 
   return (
-    <div className="p-3 md:p-6 bg-[#FBFBFE]">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 md:p-8 pb-16">
       <Toaster position="top-right" />
-      
+
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <button onClick={() => router.back()} className="p-2 hover:bg-gray-100 rounded-xl transition-all"><ChevronLeft size={20} /></button>
-              <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-                <ShoppingBag className="text-orange-500" /> Marketplace Input
-              </h1>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="p-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl transition-all"
+                title="Kembali"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <div>
+                <h1 className="text-xl md:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                  <ShoppingBag className="text-orange-500 shrink-0" size={22} />
+                  <span>Input Pesanan Marketplace</span>
+                </h1>
+                <p className="text-xs md:text-sm font-medium text-slate-500 mt-0.5">
+                  Catat pesanan manual Shopee atau TikTok dan potong stok gudang otomatis.
+                </p>
+              </div>
             </div>
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest ml-10">Manual Marketplace Entry</p>
           </div>
 
-          <div className="flex bg-white p-1.5 rounded-2xl border border-gray-100 shadow-sm">
-            <button onClick={() => setChannel('SHOPEE')} className={`px-6 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all ${channel === 'SHOPEE' ? 'bg-orange-500 text-white shadow-lg shadow-orange-100' : 'text-gray-400 hover:bg-gray-50'}`}>SHOPEE</button>
-            <button onClick={() => setChannel('TIKTOK')} className={`px-6 py-2.5 rounded-xl text-xs font-black tracking-widest transition-all ${channel === 'TIKTOK' ? 'bg-black text-white shadow-lg shadow-gray-200' : 'text-gray-400 hover:bg-gray-50'}`}>TIKTOK</button>
+          <div className="w-full sm:w-auto grid grid-cols-2 sm:flex bg-white p-1 rounded-2xl border border-slate-200/80 shadow-xs">
+            <button
+              type="button"
+              onClick={() => setChannel('SHOPEE')}
+              className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all ${
+                channel === 'SHOPEE'
+                  ? 'bg-orange-500 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              Shopee
+            </button>
+            <button
+              type="button"
+              onClick={() => setChannel('TIKTOK')}
+              className={`px-5 py-2.5 rounded-xl text-xs font-bold tracking-wide transition-all ${
+                channel === 'TIKTOK'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              TikTok Shop
+            </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-8 space-y-6">
-            <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
-                  <Hash size={12} /> Order ID Marketplace
-                </label>
-                <input 
-                  type="text" 
-                  value={externalOrderId} 
-                  onChange={e => setExternalOrderId(e.target.value)}
-                  placeholder="Contoh: 240427SHPXXX" 
-                  className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-orange-500 transition-all"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
-                  <User size={12} /> Nama Pembeli (Opsional)
-                </label>
-                <input 
-                  type="text" 
-                  value={customerName}
-                  onChange={e => setCustomerName(e.target.value)}
-                  placeholder="Nama Customer..." 
-                  className="w-full bg-gray-50 p-4 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-blue-500 transition-all"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-gray-400 uppercase tracking-widest px-1 flex items-center gap-1.5">
-                  <Truck size={12} /> Ongkos Kirim
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">Rp</span>
-                  <input 
-                    type="number" 
-                    value={shippingCost}
-                    onChange={e => setShippingCost(Number(e.target.value))}
-                    className="w-full bg-gray-50 p-4 pl-10 rounded-2xl text-xs font-black outline-none border border-transparent focus:border-green-500 transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <CartTable 
-              cart={cart} 
-              onUpdateQty={updateQty} 
-              onSetQty={setQty}
-              onUpdatePrice={updatePrice}
-              onUpdateUnit={updateUnit}
-              onRemove={removeFromCart} 
-            />
-          </div>
-
-          <div className="lg:col-span-4 space-y-6">
-            <div className="h-[400px]">
-              <ProductSearchList 
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
-                products={filteredProducts}
-                onAddToCart={handleAddToCart}
-                channel={channel}
+        {/* Grid Utama: Mobile (Form -> Cari -> Keranjang -> Ringkasan), Desktop (Kiri: Form+Keranjang, Kanan: Cari+Ringkasan) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-start">
+          {/* 1. Form Info Order */}
+          <div className="lg:col-span-8 lg:col-start-1 lg:row-start-1 bg-white p-4 md:p-5 rounded-3xl border border-slate-200/80 shadow-xs grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                <Hash size={13} className="text-slate-400" />
+                <span>Order ID Marketplace *</span>
+              </label>
+              <input
+                type="text"
+                value={externalOrderId}
+                onChange={e => setExternalOrderId(e.target.value)}
+                placeholder="Contoh: 240427SHPXXX"
+                className="w-full bg-slate-50 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none border border-slate-200/80 focus:bg-white focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-all"
               />
             </div>
 
-            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-[0.03] rotate-12">
-                <Store size={120} />
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                <User size={13} className="text-slate-400" />
+                <span>Nama Pembeli (Opsional)</span>
+              </label>
+              <input
+                type="text"
+                value={customerName}
+                onChange={e => setCustomerName(e.target.value)}
+                placeholder="Nama pelanggan..."
+                className="w-full bg-slate-50 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold text-slate-900 placeholder:text-slate-400 outline-none border border-slate-200/80 focus:bg-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                <Truck size={13} className="text-slate-400" />
+                <span>Ongkos Kirim</span>
+              </label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={shippingCost}
+                  onChange={e => setShippingCost(Number(e.target.value))}
+                  className="w-full bg-slate-50 py-2.5 pl-9 pr-3.5 rounded-xl text-xs md:text-sm font-bold tabular-nums text-slate-900 outline-none border border-slate-200/80 focus:bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all"
+                />
               </div>
-              <div className="relative z-10 space-y-4">
-                <div className="flex justify-between items-center text-gray-400">
-                  <span className="text-xs font-black uppercase tracking-widest">Subtotal</span>
-                  <span className="text-xs font-black">Rp{subtotal.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center text-gray-400">
-                  <span className="text-xs font-black uppercase tracking-widest">Shipping</span>
-                  <span className="text-xs font-black">Rp{shippingCost.toLocaleString()}</span>
-                </div>
+            </div>
+          </div>
 
-                {/* Mode harga + biaya admin marketplace */}
-                <div className="pt-4 border-t border-gray-50 space-y-3">
-                  <p className="text-[11px] font-black uppercase tracking-widest text-gray-400">
-                    Cara Mengisi Harga
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setHargaMode('AUTO')}
-                      className={`px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition ${
-                        hargaMode === 'AUTO'
-                          ? 'bg-orange-600 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Otomatis
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setHargaMode('MANUAL')}
-                      className={`px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest transition ${
-                        hargaMode === 'MANUAL'
-                          ? 'bg-orange-600 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Manual
-                    </button>
+          {/* 2. Pencarian Produk */}
+          <div className="lg:col-span-4 lg:col-start-9 lg:row-start-1">
+            <ProductSearchList
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              products={filteredProducts}
+              onAddToCart={handleAddToCart}
+              channel={channel}
+            />
+          </div>
+
+          {/* 3. Daftar Keranjang */}
+          <div className="lg:col-span-8 lg:col-start-1 lg:row-start-2">
+            <CartTable
+              cart={cart}
+              onUpdateQty={updateQty}
+              onSetQty={setQty}
+              onUpdatePrice={updatePrice}
+              onUpdateUnit={updateUnit}
+              onRemove={removeFromCart}
+            />
+          </div>
+
+          {/* 4. Ringkasan Biaya & Simpan */}
+          <div className="lg:col-span-4 lg:col-start-9 lg:row-start-2 bg-white p-5 md:p-6 rounded-3xl border border-slate-200/80 shadow-sm relative overflow-hidden">
+            <div className="absolute -top-2 -right-2 p-6 opacity-[0.03] rotate-12 pointer-events-none">
+              <Store size={110} />
+            </div>
+            <div className="relative z-10 space-y-4">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-slate-500">
+                  <span className="text-xs font-semibold">Subtotal Barang</span>
+                  <span className="text-xs font-bold tabular-nums text-slate-800">
+                    Rp {subtotal.toLocaleString('id-ID')}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-slate-500">
+                  <span className="text-xs font-semibold">Ongkos Kirim</span>
+                  <span className="text-xs font-bold tabular-nums text-slate-800">
+                    Rp {shippingCost.toLocaleString('id-ID')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Mode harga + biaya admin marketplace */}
+              <div className="pt-3.5 border-t border-slate-100 space-y-2.5">
+                <p className="text-xs font-bold text-slate-700">
+                  Cara Mengisi Harga Jual
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setHargaMode('AUTO')}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      hargaMode === 'AUTO'
+                        ? 'bg-orange-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Otomatis
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHargaMode('MANUAL')}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      hargaMode === 'MANUAL'
+                        ? 'bg-orange-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    Manual
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  {keteranganMode(hargaMode, biayaAdmin.tarif)}
+                </p>
+
+                {hargaMode === 'AUTO' ? (
+                  <div className="space-y-1.5 rounded-2xl bg-orange-50/80 border border-orange-100 p-3.5">
+                    <div className="flex justify-between text-xs font-semibold text-orange-800">
+                      <span>Harga jual (bruto)</span>
+                      <span className="tabular-nums">Rp {subtotal.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-semibold text-rose-600">
+                      <span>Biaya admin {channel} ({biayaAdmin.tarif}%)</span>
+                      <span className="tabular-nums">− Rp {biayaAdmin.biaya.toLocaleString('id-ID')}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-extrabold text-emerald-700 pt-1.5 border-t border-orange-200/60">
+                      <span>Uang bersih diterima</span>
+                      <span className="tabular-nums">Rp {biayaAdmin.bersih.toLocaleString('id-ID')}</span>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-gray-500 leading-relaxed">
-                    {keteranganMode(hargaMode, biayaAdmin.tarif)}
-                  </p>
-
-                  {hargaMode === 'AUTO' ? (
-                    <div className="space-y-1 rounded-xl bg-orange-50 p-3">
-                      <div className="flex justify-between text-[11px] font-black text-orange-700">
-                        <span>Harga jual (bruto)</span>
-                        <span>Rp{subtotal.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-[11px] font-black text-rose-600">
-                        <span>Biaya admin {channel} ({biayaAdmin.tarif}%)</span>
-                        <span>− Rp{biayaAdmin.biaya.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between text-xs font-black text-emerald-700 pt-1 border-t border-orange-100">
-                        <span>Uang bersih diterima</span>
-                        <span>Rp{biayaAdmin.bersih.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl bg-emerald-50 p-3 text-[11px] font-bold text-emerald-800">
-                      Uang bersih diterima: Rp{subtotal.toLocaleString()} — biaya admin tidak
-                      dikurangkan lagi (sudah dipotong marketplace).
-                    </div>
-                  )}
-                </div>
-                <div className="pt-4 border-t border-gray-50 flex justify-between items-center">
-                  <span className="text-xs font-black uppercase tracking-widest">Grand Total</span>
-                  <span className="text-2xl font-black text-orange-600">Rp{total.toLocaleString()}</span>
-                </div>
-
-                <div className="pt-6 space-y-3">
-                  {/* Pilih Gudang Pengambilan Stok */}
-                  <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-2xl border border-blue-200">
-                    <Warehouse className="text-blue-500 shrink-0" size={18} />
-                    <div className="flex-1">
-                      <p className="text-xs font-black text-blue-400 uppercase tracking-widest mb-0.5">Gudang Stok *</p>
-                      <select
-                        value={warehouseId}
-                        onChange={e => setWarehouseId(e.target.value)}
-                        className="bg-transparent text-xs font-black text-blue-800 outline-none w-full"
-                      >
-                        {warehouses.length === 0 && <option value="gudang-utama">Gudang Utama</option>}
-                        {warehouses.map(w => (
-                          <option key={w.id} value={w.id}>{w.name}</option>
-                        ))}
-                      </select>
-                    </div>
+                ) : (
+                  <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-3.5 text-xs font-semibold text-emerald-800 leading-relaxed">
+                    Uang bersih diterima:{' '}
+                    <span className="font-extrabold tabular-nums">Rp {subtotal.toLocaleString('id-ID')}</span> — biaya admin tidak dikurangkan lagi.
                   </div>
+                )}
+              </div>
 
-                  {/* Metode Pembayaran */}
-                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                    <CreditCard className="text-gray-400 shrink-0" size={18} />
+              <div className="pt-3.5 border-t border-slate-100 flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-700">Total Tagihan</span>
+                <span className="text-xl md:text-2xl font-extrabold tabular-nums text-orange-600">
+                  Rp {total.toLocaleString('id-ID')}
+                </span>
+              </div>
+
+              <div className="pt-2 space-y-2.5">
+                {/* Pilih Gudang Pengambilan Stok */}
+                <div className="flex items-center gap-3 p-3.5 bg-blue-50/70 rounded-2xl border border-blue-200/80">
+                  <Warehouse className="text-blue-600 shrink-0" size={18} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-bold text-blue-600 mb-0.5">Gudang Pengambilan Stok *</p>
+                    <select
+                      value={warehouseId}
+                      onChange={e => setWarehouseId(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-blue-950 outline-none w-full cursor-pointer"
+                    >
+                      {warehouses.length === 0 && <option value="gudang-utama">Gudang Utama</option>}
+                      {warehouses.map(w => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Metode Pembayaran */}
+                <div className="flex items-center gap-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80">
+                  <CreditCard className="text-slate-500 shrink-0" size={18} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] font-semibold text-slate-500 mb-0.5">Metode Pembayaran</p>
                     <select
                       value={paymentMethod}
                       onChange={e => setPaymentMethod(e.target.value)}
-                      className="bg-transparent text-xs font-black uppercase tracking-widest outline-none w-full"
+                      className="bg-transparent text-xs font-bold text-slate-800 outline-none w-full cursor-pointer"
                     >
                       <option value="TRANSFER">Transfer Bank</option>
                       <option value="CASH">Saldo Marketplace</option>
                       <option value="QRIS">QRIS / E-Wallet</option>
                     </select>
                   </div>
-
-                  <button
-                    onClick={handleSaveOrder}
-                    disabled={loading || cart.length === 0 || !warehouseId}
-                    className="w-full bg-gray-900 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-2xl shadow-gray-200 hover:bg-black active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:pointer-events-none"
-                  >
-                    {loading ? <Activity className="animate-spin" size={16} /> : <Save size={16} />}
-                    Simpan Pesanan
-                  </button>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveOrder}
+                  disabled={loading || cart.length === 0 || !warehouseId}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3.5 rounded-2xl font-bold text-xs md:text-sm shadow-lg shadow-slate-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  {loading ? <Activity className="animate-spin" size={16} /> : <Save size={16} />}
+                  <span>Simpan Pesanan</span>
+                </button>
               </div>
             </div>
           </div>
