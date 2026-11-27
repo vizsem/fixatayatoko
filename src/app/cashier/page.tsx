@@ -63,6 +63,8 @@ type Product = {
   kategori?: string;
   parentId?: string;
   isParentOnly?: boolean;
+  isColdAvailable?: boolean;
+  coldSurcharge?: number;
   // Customer tier prices
   priceSemiGrosir?: number;
   priceGrosir?: number;
@@ -88,6 +90,8 @@ type CartItem = {
   contains?: number; // how many pcs per chosen unit
   channel?: ChannelKey; // Add channel to CartItem
   appliedTier?: 'Retail' | 'Semi-Grosir' | 'Grosir' | string; // Customer tier applied
+  isCold?: boolean;
+  coldSurcharge?: number;
 };
 
 type Order = {
@@ -467,6 +471,8 @@ export default function CashierPOS() {
         contains,
         channel,
         appliedTier: appliedTierFinal,
+        isCold: false,
+        coldSurcharge: isBaseUnit && product.isColdAvailable ? Number(product.coldSurcharge || 0) : 0,
       }];
     });
   }, [transactionType, getChannelKey, selectedCustomer, variantsByParentId]);
@@ -656,6 +662,8 @@ export default function CashierPOS() {
             stockByWarehouse: raw.stockByWarehouse || {},
             parentId: (raw.Parent_ID || raw.parentId || raw.parent_id || '').toString().trim() || undefined,
             isParentOnly: Boolean(raw.isParentOnly || raw.is_parent_only),
+            isColdAvailable: Boolean(raw.isColdAvailable),
+            coldSurcharge: Number(raw.coldSurcharge || 0),
           };
         }
       }
@@ -1640,6 +1648,8 @@ Tetap lanjutkan menyimpan harga ini?`
             priceTiers: Array.isArray(raw.priceTiers) ? raw.priceTiers : undefined,
             parentId: (raw.Parent_ID || raw.parentId || raw.parent_id || '').toString().trim() || undefined,
             isParentOnly: Boolean(raw.isParentOnly || raw.is_parent_only),
+            isColdAvailable: Boolean(raw.isColdAvailable),
+            coldSurcharge: Number(raw.coldSurcharge || 0),
             updatedAt: d.updated_at || raw.updated_at || raw.updatedAt || '',
             Kategori: String(raw.Kategori || raw.kategori || raw.category || 'UMUM').toUpperCase(),
             kategori: String(raw.Kategori || raw.kategori || raw.category || 'UMUM').toUpperCase(),
@@ -2322,7 +2332,10 @@ Tetap lanjutkan menyimpan harga ini?`
       const orderData = {
         customerName: resolvedCustomerName,
         customerPhone: resolvedCustomerPhone,
-        items: cart,
+        items: cart.map(item => ({
+          ...item,
+          name: item.isCold ? `${item.name} (Dingin)` : item.name,
+        })),
         subtotal, shippingCost, total,
         paymentMethod, paymentProofUrl: proofUrl,
         deliveryMethod, transactionType,
@@ -2363,7 +2376,7 @@ Tetap lanjutkan menyimpan harga ini?`
         receiptNo: clientReceiptNo,
         items: cart.map(item => ({
           id: item.id,
-          name: item.name,
+          name: item.isCold ? `${item.name} (Dingin)` : item.name,
           price: item.price,
           originalPrice: item.originalPrice ?? item.price,
           quantity: item.quantity,
@@ -2401,7 +2414,7 @@ Tetap lanjutkan menyimpan harga ini?`
             await enqueueOfflineTx({
               orderId,
               items: cart.map(item => ({
-                id: item.id, name: item.name, price: item.price,
+                id: item.id, name: item.isCold ? `${item.name} (Dingin)` : item.name, price: item.price,
                 quantity: item.quantity, unit: item.unit, contains: item.contains || 1,
               })),
               subtotal, shippingCost, total, paymentMethod,
@@ -3408,7 +3421,7 @@ Tetap lanjutkan menyimpan harga ini?`
                         if (!isBase) return item;
                         return {
                           ...item,
-                          price: prod.price,
+                          price: prod.price + (item.isCold ? Number(item.coldSurcharge || 0) : 0),
                           originalPrice: prod.price,
                           appliedTier: 'Retail',
                         };
@@ -3440,7 +3453,7 @@ Tetap lanjutkan menyimpan harga ini?`
                         });
                         return {
                           ...item,
-                          price: tierResult.effectivePrice,
+                          price: tierResult.effectivePrice + (item.isCold ? Number(item.coldSurcharge || 0) : 0),
                           originalPrice: prod.price,
                           appliedTier: 'Semi-Grosir',
                         };
@@ -3477,7 +3490,7 @@ Tetap lanjutkan menyimpan harga ini?`
                         });
                         return {
                           ...item,
-                          price: tierResult.effectivePrice,
+                          price: tierResult.effectivePrice + (item.isCold ? Number(item.coldSurcharge || 0) : 0),
                           originalPrice: prod.price,
                           appliedTier: 'Grosir',
                         };
@@ -3622,6 +3635,37 @@ Tetap lanjutkan menyimpan harga ini?`
                             </span>
                           )}
                         </div>
+                        {(() => {
+                          const prod = products.find(p => p.id === item.id);
+                          const coldFee = Number(item.coldSurcharge ?? prod?.coldSurcharge ?? 0);
+                          const canBeCold = (prod?.isColdAvailable || item.isCold) && (item.contains || 1) <= 1 && coldFee > 0;
+                          if (!canBeCold) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCart(prev => prev.map(ci => {
+                                  if (ci.id !== item.id || ci.unit !== item.unit) return ci;
+                                  const nextCold = !ci.isCold;
+                                  return {
+                                    ...ci,
+                                    isCold: nextCold,
+                                    coldSurcharge: coldFee,
+                                    price: nextCold ? ci.price + coldFee : Math.max(0, ci.price - coldFee),
+                                  };
+                                }));
+                              }}
+                              className={`mt-1 self-start inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all border ${
+                                item.isCold
+                                  ? 'bg-sky-600 text-white border-sky-600 shadow-2xs'
+                                  : 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100'
+                              }`}
+                            >
+                              <span>❄️</span>
+                              <span>{item.isCold ? `Dingin (+Rp${coldFee.toLocaleString('id-ID')})` : `Kulkas (+Rp${coldFee.toLocaleString('id-ID')})`}</span>
+                            </button>
+                          );
+                        })()}
                       </div>
                       {editingPriceId === item.id ? (
                         <div className="flex flex-col items-end">
@@ -3757,7 +3801,21 @@ Tetap lanjutkan menyimpan harga ini?`
                               if (ci.id !== item.id) return ci;
                               const nextQty = minQty && ci.quantity < minQty ? minQty : ci.quantity;
                               if (minQty && ci.quantity < minQty) toast.success(`Min. qty ${code}: ${minQty}. Qty disesuaikan.`);
-                              return { ...ci, unit: code, contains: Math.max(contains, code === baseUnit ? 1 : contains), price: unitPrice, originalPrice: unitOriginalPrice, cost: unitCost, quantity: nextQty, channel, appliedTier: 'Retail' };
+                              const keepCold = isBase && Boolean(ci.isCold);
+                              const coldFee = isBase ? Number(ci.coldSurcharge ?? prod?.coldSurcharge ?? 0) : 0;
+                              return {
+                                ...ci,
+                                unit: code,
+                                contains: Math.max(contains, code === baseUnit ? 1 : contains),
+                                price: unitPrice + (keepCold ? coldFee : 0),
+                                originalPrice: unitOriginalPrice,
+                                cost: unitCost,
+                                quantity: nextQty,
+                                channel,
+                                appliedTier: 'Retail',
+                                isCold: keepCold,
+                                coldSurcharge: isBase && prod?.isColdAvailable ? coldFee : 0,
+                              };
                             }));
                           }}
                           className="text-xs font-bold text-gray-600 bg-white border rounded-lg px-2 py-1"

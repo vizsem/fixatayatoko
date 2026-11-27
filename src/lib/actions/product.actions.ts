@@ -860,6 +860,9 @@ export async function addProductFull(payload: {
       poNotes: (payload as any).poNotes || '',
       // Pajak (PPN)
       isTaxable: payload.isTaxable !== undefined ? Boolean(payload.isTaxable) : undefined,
+      // Minuman Dingin (Kulkas)
+      isColdAvailable: Boolean((payload as any).isColdAvailable),
+      coldSurcharge: Boolean((payload as any).isColdAvailable) ? Math.max(0, Number((payload as any).coldSurcharge || 0)) : 0,
       createdAt: now,
       updatedAt: now,
     };

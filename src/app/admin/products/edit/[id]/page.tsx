@@ -221,6 +221,9 @@ export default function EditProductPage() {
   const [poLeadTimeDays, setPoLeadTimeDays] = useState(3);
   const [poNotes, setPoNotes] = useState('');
   const [isTaxable, setIsTaxable] = useState<boolean>(true);
+  // Cold Drink (Kulkas) State
+  const [isColdAvailable, setIsColdAvailable] = useState(false);
+  const [coldSurcharge, setColdSurcharge] = useState<number>(500);
 
   // Cost History State
   const [costHistory, setCostHistory] = useState<any[]>([]);
@@ -578,6 +581,10 @@ export default function EditProductPage() {
 
       const rawTaxable = data.isTaxable ?? (data as any).raw_data?.isTaxable;
       setIsTaxable(rawTaxable !== undefined ? Boolean(rawTaxable) : !isCategoryTaxExempt(data.Kategori || data.category));
+
+      setIsColdAvailable(Boolean((data as any).isColdAvailable ?? (data as any).raw_data?.isColdAvailable));
+      const rawColdFee = Number((data as any).coldSurcharge ?? (data as any).raw_data?.coldSurcharge ?? 500);
+      setColdSurcharge(Number.isFinite(rawColdFee) && rawColdFee >= 0 ? rawColdFee : 500);
 
       // Handle Units
       const existingUnits = Array.isArray(data.units) ? (data.units as UnitOption[]) : [];
@@ -1050,6 +1057,8 @@ export default function EditProductPage() {
         poLeadTimeDays,
         poNotes,
         isTaxable,
+        isColdAvailable,
+        coldSurcharge: isColdAvailable ? Math.max(0, Number(coldSurcharge || 0)) : 0,
         updatedAt: new Date().toISOString(),
       };
 
@@ -2551,6 +2560,47 @@ export default function EditProductPage() {
                           onChange={(e) => setPoNotes(e.target.value)}
                         />
                       </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Minuman Dingin (Kulkas) Toggle */}
+                <div className="pt-3 border-t border-slate-100 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                        <span>❄️</span> Tersedia Dingin (Kulkas)
+                      </p>
+                      <p className="text-[10px] text-slate-400">Opsi tambah harga di kasir saat ambil dari kulkas</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={isColdAvailable}
+                        onChange={(e) => setIsColdAvailable(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sky-500"></div>
+                    </label>
+                  </div>
+
+                  {isColdAvailable && (
+                    <div className="p-3 bg-sky-50/80 rounded-xl border border-sky-200 space-y-1.5">
+                      <label className="text-[10px] font-bold uppercase text-sky-900 block">
+                        Tambahan Harga Dingin (+Rp / {formData.Satuan || 'PCS'})
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={100}
+                        placeholder="500"
+                        className="w-full px-2.5 py-1.5 bg-white rounded-lg border border-sky-200 text-xs font-bold text-sky-950 tabular-nums outline-none focus:ring-2 focus:ring-sky-400"
+                        value={coldSurcharge}
+                        onChange={(e) => setColdSurcharge(Math.max(0, Number(e.target.value || 0)))}
+                      />
+                      <p className="text-[10px] text-sky-700 leading-snug">
+                        Harga kulkas: <strong>Rp{(Number(formData.Ecer || 0) + Number(coldSurcharge || 0)).toLocaleString('id-ID')}</strong> (Normal Rp{Number(formData.Ecer || 0).toLocaleString('id-ID')} + Rp{Number(coldSurcharge || 0).toLocaleString('id-ID')})
+                      </p>
                     </div>
                   )}
                 </div>

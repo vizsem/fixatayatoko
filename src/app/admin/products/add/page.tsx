@@ -133,6 +133,8 @@ export default function AddProductPage() {
   const [poLeadTimeDays, setPoLeadTimeDays] = useState(3);
   const [poNotes, setPoNotes] = useState('');
   const [isTaxable, setIsTaxable] = useState<boolean>(true);
+  const [isColdAvailable, setIsColdAvailable] = useState(false);
+  const [coldSurcharge, setColdSurcharge] = useState<number>(500);
   const [pricingMode, setPricingMode] = useState<'MANUAL' | 'RECOMMENDED'>('MANUAL');
   const [pricingRuleKey, setPricingRuleKey] = useState<string>('AUTO');
   const [pricingMarginPercent, setPricingMarginPercent] = useState<number>(0);
@@ -597,7 +599,9 @@ export default function AddProductPage() {
         poLeadTimeDays,
         poNotes,
         isTaxable,
-      });
+        isColdAvailable,
+        coldSurcharge: isColdAvailable ? Math.max(0, Number(coldSurcharge || 0)) : 0,
+      } as any);
 
       if (!result.success) {
         throw new Error(result.error || 'Gagal menyimpan produk');
@@ -2163,6 +2167,47 @@ export default function AddProductPage() {
                   </div>
                 </div>
               )}
+
+              {/* Minuman Dingin (Kulkas) Toggle */}
+              <div className="pt-4 mt-4 border-t border-gray-100 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-gray-900 flex items-center gap-1.5">
+                      <span>❄️</span> Tersedia Dingin (Kulkas)
+                    </h4>
+                    <p className="text-[10px] text-gray-500 font-bold">Opsi tambah harga di kasir saat ambil dari kulkas</p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={isColdAvailable}
+                      onChange={(e) => setIsColdAvailable(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-sky-500"></div>
+                  </label>
+                </div>
+
+                {isColdAvailable && (
+                  <div className="p-3.5 bg-sky-50 border border-sky-200 rounded-2xl space-y-1.5">
+                    <label className="text-[10px] font-black uppercase text-sky-900 block">
+                      Tambahan Harga Dingin (+Rp / {formData.Satuan || 'PCS'})
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={100}
+                      placeholder="500"
+                      className="w-full p-2.5 bg-white rounded-xl border border-sky-200 text-xs font-black text-sky-950 tabular-nums outline-none focus:ring-2 focus:ring-sky-400"
+                      value={coldSurcharge}
+                      onChange={(e) => setColdSurcharge(Math.max(0, Number(e.target.value || 0)))}
+                    />
+                    <p className="text-[10px] text-sky-700">
+                      Harga kulkas: <strong>Rp{(Number(formData.Ecer || 0) + Number(coldSurcharge || 0)).toLocaleString('id-ID')}</strong>
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
