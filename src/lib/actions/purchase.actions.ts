@@ -8,6 +8,7 @@ import { revalidatePath } from 'next/cache'
 import { supabaseAdmin } from '@/lib/supabase'
 import { addStock, deductStockFEFO } from '@/lib/inventory'
 import { catatMutasiModalPO } from '@/lib/capital-ledger'
+import { shortTxCode } from '@/lib/ids'
 
 type PurchaseItemInput = {
   productId: string
@@ -261,7 +262,7 @@ export async function createPurchaseOrder(data: {
   await requireAdmin();
   try {
     const totalAmount = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-    const poNumber = `PO-${Date.now()}`;
+    const poNumber = shortTxCode('PO');
     const id = `po_${Date.now()}`;
     const targetWarehouse = data.warehouseId || 'gudang-utama';
     let paymentStatus = String(data.paymentStatus || 'LUNAS').toUpperCase();

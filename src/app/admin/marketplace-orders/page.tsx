@@ -25,7 +25,7 @@ import * as Sentry from '@sentry/nextjs';
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { getUserAndRole, sbGetDoc } from '@/lib/supabase-helpers';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { millisId, timestampId } from '@/lib/ids';
+import { shortTxCode, timestampId } from '@/lib/ids';
 import {
   TARIF_DEFAULT,
   hitungBiayaAdmin,
@@ -383,7 +383,7 @@ export default function MarketplaceOrdersPage() {
       const { data: { user } } = await supabase.auth.getUser();
       const adminId = user?.id || 'system';
       const now = new Date().toISOString();
-      const orderId = millisId('MKT');
+      const orderId = shortTxCode('MKT');
       const dbOrderId = timestampId('mkt', 4);
 
       const CTN_ALIASES = ['CTN', 'KARTON', 'DUS', 'BOX'];

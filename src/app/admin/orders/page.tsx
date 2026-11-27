@@ -15,6 +15,7 @@ import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import { TableSkeleton } from '@/components/admin/InventorySkeleton';
 import { getSalesOrders, updateSalesOrderStatus, cancelSalesOrder, reorderSalesOrder, deleteDraftOrCancelledOrders } from '@/lib/actions/sales.actions';
+import { formatShortTxNo } from '@/lib/ids';
 
 type Order = {
   id: string;
@@ -198,27 +199,9 @@ export default function AdminOrders() {
     loadOrders();
   };
 
-  const formatShortOrderNo = (rawNo: string) => {
-    const clean = String(rawNo || '').trim();
-    if (!clean) return '-';
-    // Jika format panjang seperti SO-1795625399892 atau ORD-1795625399892 -> ambil prefix + 6 karakter terakhir
-    const match = clean.match(/^([A-Z]+)-(\d{9,})$/i);
-    if (match) {
-      return `${match[1].toUpperCase()}-${match[2].slice(-6)}`;
-    }
-    if (clean.length > 14) {
-      const parts = clean.split('-');
-      if (parts.length > 1) {
-        return `${parts[0]}-${parts[parts.length - 1].slice(-6)}`;
-      }
-      return `#${clean.slice(-6)}`;
-    }
-    return clean;
-  };
-
   const filteredOrders = orders.filter(order => {
     const q = searchTerm.trim().toLowerCase();
-    const shortNo = formatShortOrderNo(order.soNumber || '').toLowerCase();
+    const shortNo = formatShortTxNo(order.soNumber || '').toLowerCase();
     const matchesSearch =
       !q ||
       (order.soNumber || '').toLowerCase().includes(q) ||
@@ -454,7 +437,8 @@ export default function AdminOrders() {
                           className="font-mono font-bold text-xs text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg hover:bg-blue-100 transition-colors"
                           title={`Nomor Lengkap: ${order.soNumber}`}
                         >
-                          {formatShortOrderNo(order.soNumber)}
+                          {formatShortTxNo(order.soNumber)}
+                          {formatShortTxNo(order.soNumber)}
                         </button>
                         <span className={`text-[11px] px-2.5 py-0.5 rounded-lg font-semibold border ${getStatusColor(order.status)}`}>
                           {getStatusLabel(order.status)}
@@ -896,7 +880,8 @@ export default function AdminOrders() {
                       className="font-mono font-bold text-sm text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-lg"
                       title={`Nomor Lengkap: ${quickViewOrder.soNumber}`}
                     >
-                      {formatShortOrderNo(quickViewOrder.soNumber)}
+                      {formatShortTxNo(quickViewOrder.soNumber)}
+                      {formatShortTxNo(quickViewOrder.soNumber)}
                     </span>
                     <span className={`text-xs px-2.5 py-0.5 rounded-lg font-semibold border ${getStatusColor(quickViewOrder.status)}`}>
                       {getStatusLabel(quickViewOrder.status)}

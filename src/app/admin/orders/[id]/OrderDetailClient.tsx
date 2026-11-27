@@ -19,6 +19,7 @@ import notify from '@/lib/notify';
 import { Toaster } from 'react-hot-toast';
 import dynamic from 'next/dynamic';
 import { addInventoryLog, InventoryLogData } from '@/lib/inventory';
+import { formatShortTxNo } from '@/lib/ids';
 import { FirestoreTimestamp } from '@/lib/types';
 import {
   createReturnRequest,
@@ -536,7 +537,7 @@ export default function OrderDetailClient({
               <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <div>
                   <h2 className="text-xl font-black text-slate-900">Retur Barang</h2>
-                  <p className="text-xs text-slate-400">Order #{order.id.slice(-8)}</p>
+                  <p className="text-xs text-slate-400">Order {formatShortTxNo(order.id)}</p>
                 </div>
                 <button onClick={() => setIsReturnModalOpen(false)} className="p-2 hover:bg-white rounded-xl transition-all"><XCircle size={24} className="text-slate-300" /></button>
               </div>
@@ -635,7 +636,7 @@ export default function OrderDetailClient({
                 {order.status}
               </div>
               <p className="text-xl font-black tracking-tight text-slate-800">
-                #ORD-{order.id.substring(0, 12).toUpperCase()}
+                {formatShortTxNo(order.id)}
               </p>
               {order.externalOrderId && (
                 <p className="text-xs font-semibold text-orange-600">

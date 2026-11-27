@@ -21,6 +21,7 @@ import { getWarehouses } from '@/lib/actions/inventory.actions';
 import ProductSearchCombobox from '@/components/admin/ProductSearchCombobox';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import { getLargestPurchaseUnit, getPurchaseUnitPrice } from '@/lib/normalize';
+import { formatShortTxNo } from '@/lib/ids';
 import { sbGetDocs } from '@/lib/supabase-helpers';
 import * as XLSX from 'xlsx';
 
@@ -186,6 +187,7 @@ export default function AdminPurchases() {
     const q = search.trim().toLowerCase();
     const matchSearch = !q ||
       p.poNumber.toLowerCase().includes(q) ||
+      formatShortTxNo(p.poNumber).toLowerCase().includes(q) ||
       (p.supplier?.name || '').toLowerCase().includes(q) ||
       (p.paymentMethod || '').toLowerCase().includes(q) ||
       (p.paymentStatus || '').toLowerCase().includes(q) ||
@@ -688,6 +690,7 @@ export default function AdminPurchases() {
                         className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
                       />
                       <span className="font-mono text-xs font-bold text-gray-800">{po.poNumber}</span>
+                      <span className="font-mono text-xs font-bold text-gray-800" title={po.poNumber}>{formatShortTxNo(po.poNumber)}</span>
                     </div>
                     <span className={`px-2 py-0.5 rounded-lg text-xs font-black uppercase ${STATUS_COLOR[po.status]}`}>
                       {STATUS_LABEL[po.status] || po.status}
@@ -811,6 +814,7 @@ export default function AdminPurchases() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="font-mono text-xs font-bold text-gray-800">{po.poNumber}</span>
+                        <span className="font-mono text-xs font-bold text-gray-800" title={po.poNumber}>{formatShortTxNo(po.poNumber)}</span>
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-gray-800">{po.supplier.name}</p>
@@ -1151,6 +1155,7 @@ export default function AdminPurchases() {
               <button onClick={() => setReceiveModal(null)} className="p-2.5 -m-1 rounded-lg hover:bg-gray-100" aria-label="Tutup"><X size={18} /></button>
             </div>
             <p className="text-xs text-gray-500 mb-4">PO: <strong>{receiveModal.poNumber}</strong> — {receiveModal.supplier.name}</p>
+            <p className="text-xs text-gray-500 mb-4">PO: <strong title={receiveModal.poNumber}>{formatShortTxNo(receiveModal.poNumber)}</strong> — {receiveModal.supplier.name}</p>
 
             <div className="space-y-3">
               <div>
@@ -1275,6 +1280,7 @@ export default function AdminPurchases() {
               <div>
                 <h2 className="text-lg font-black text-gray-900">Detail PO</h2>
                 <p className="text-xs text-gray-500 mt-0.5 font-mono">{detailModal.poNumber}</p>
+                <p className="text-xs text-gray-500 mt-0.5 font-mono" title={detailModal.poNumber}>{formatShortTxNo(detailModal.poNumber)}</p>
               </div>
               <button onClick={() => setDetailModal(null)} className="p-2.5 -m-1 rounded-lg hover:bg-gray-100" aria-label="Tutup"><X size={18} /></button>
             </div>
@@ -1459,6 +1465,7 @@ export default function AdminPurchases() {
                     Pembayaran / Cicilan PO
                   </h3>
                   <p className="text-xs text-gray-500 font-mono mt-0.5">{selectedPayable.poNumber} • {selectedPayable.supplier.name}</p>
+                  <p className="text-xs text-gray-500 font-mono mt-0.5" title={selectedPayable.poNumber}>{formatShortTxNo(selectedPayable.poNumber)} • {selectedPayable.supplier.name}</p>
                 </div>
                 <button
                   onClick={() => setSelectedPayable(null)}
@@ -1709,6 +1716,7 @@ export default function AdminPurchases() {
                 <div key={p.id} className="py-1.5 px-2 flex justify-between items-center text-xs">
                   <div>
                     <span className="font-mono font-bold text-gray-800">{p.poNumber}</span>
+                    <span className="font-mono font-bold text-gray-800" title={p.poNumber}>{formatShortTxNo(p.poNumber)}</span>
                     <span className="text-gray-500 ml-1.5">({p.supplier.name})</span>
                   </div>
                   <span className="font-bold text-gray-900">Rp{p.totalAmount.toLocaleString('id-ID')}</span>

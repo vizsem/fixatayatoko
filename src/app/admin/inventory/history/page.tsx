@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { formatShortTxNo } from '@/lib/ids';
 import {
   History,
   ArrowLeft,
@@ -267,7 +268,7 @@ export default function InventoryHistoryPage() {
                       {(log.note || log.referenceId) && (
                         <div className="mt-2 text-xs text-gray-500 font-medium bg-gray-50 p-2 rounded-lg border border-gray-100">
                            {log.note && <p>Note: {log.note}</p>}
-                           {log.referenceId && <p className="font-mono text-gray-400 mt-0.5">Ref: {log.referenceId}</p>}
+                           {log.referenceId && <p className="font-mono text-gray-400 mt-0.5" title={log.referenceId}>Ref: {formatShortTxNo(log.referenceId)}</p>}
                         </div>
                       )}
                     </div>

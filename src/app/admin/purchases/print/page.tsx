@@ -6,6 +6,7 @@ import { ArrowLeft, Printer, FileText, Receipt, CheckCircle2 } from 'lucide-reac
 import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { getUserAndRole } from '@/lib/supabase-helpers';
 import { getPurchaseOrdersByIds } from '@/lib/actions/purchase.actions';
+import { formatShortTxNo } from '@/lib/ids';
 
 type POItem = {
   id: string;
@@ -208,27 +209,24 @@ function BulkPrintPurchaseInner() {
               <button
                 type="button"
                 onClick={() => setPrintMode('A4')}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
-                  printMode === 'A4' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:text-black'
-                }`}
+                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${printMode === 'A4' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:text-black'
+                  }`}
               >
                 <FileText size={14} /> Faktur A4
               </button>
               <button
                 type="button"
                 onClick={() => setPrintMode('58mm')}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
-                  printMode === '58mm' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:text-black'
-                }`}
+                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${printMode === '58mm' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:text-black'
+                  }`}
               >
                 <Receipt size={14} /> 58mm
               </button>
               <button
                 type="button"
                 onClick={() => setPrintMode('80mm')}
-                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${
-                  printMode === '80mm' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:text-black'
-                }`}
+                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all ${printMode === '80mm' ? 'bg-black text-white shadow-sm' : 'text-slate-600 hover:text-black'
+                  }`}
               >
                 <Receipt size={14} /> 80mm
               </button>
@@ -249,20 +247,20 @@ function BulkPrintPurchaseInner() {
         {pos.map((po, index) => {
           const dateStr = po.createdAt
             ? new Date(po.createdAt).toLocaleDateString('id-ID', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-              })
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })
             : '-';
 
           const dueDateStr = po.dueDate
             ? new Date(po.dueDate).toLocaleDateString('id-ID', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+            })
             : '-';
 
           return (
@@ -281,7 +279,7 @@ function BulkPrintPurchaseInner() {
                       <span className="inline-block px-3 py-1 bg-gray-900 text-white text-xs font-black tracking-widest uppercase rounded">
                         PURCHASE ORDER (PO)
                       </span>
-                      <p className="font-mono font-bold text-base mt-2 text-gray-900">{po.poNumber}</p>
+                      <p className="font-mono font-bold text-base mt-2 text-gray-900">{formatShortTxNo(po.poNumber)}</p>
                       <p className="text-xs text-gray-500 mt-0.5">{dateStr}</p>
                     </div>
                   </div>
@@ -410,9 +408,8 @@ function BulkPrintPurchaseInner() {
               {/* ===== MODE 2 & 3: STRUK THERMAL (58mm / 80mm) ===== */}
               {(printMode === '58mm' || printMode === '80mm') && (
                 <div
-                  className={`thermal-receipt bg-white text-black mx-auto border border-dashed border-slate-300 print:border-none shadow-md print:shadow-none ${
-                    printMode === '58mm' ? 'w-[58mm] max-w-[58mm]' : 'w-[80mm] max-w-[80mm]'
-                  }`}
+                  className={`thermal-receipt bg-white text-black mx-auto border border-dashed border-slate-300 print:border-none shadow-md print:shadow-none ${printMode === '58mm' ? 'w-[58mm] max-w-[58mm]' : 'w-[80mm] max-w-[80mm]'
+                    }`}
                   style={{
                     fontFamily: "'Courier New', Courier, monospace",
                     padding: printMode === '58mm' ? '4px 3px' : '6px 6px',
@@ -438,7 +435,7 @@ function BulkPrintPurchaseInner() {
                     </div>
                     <div className="flex justify-between">
                       <span>No PO:</span>
-                      <span className="font-bold">{po.poNumber}</span>
+                      <span className="font-bold">{formatShortTxNo(po.poNumber)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Supplier:</span>

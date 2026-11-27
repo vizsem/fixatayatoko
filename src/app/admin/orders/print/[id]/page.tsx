@@ -4,6 +4,7 @@ import { useEffect, useState, use, Suspense, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Printer, FileText, Receipt, Download, Loader2, AlertCircle } from 'lucide-react';
 import { getOrderForPrint, type PrintOrderData } from '@/lib/actions/order-admin.actions';
+import { formatShortTxNo } from '@/lib/ids';
 
 type PrintMode = 'a4' | 'thermal';
 type PaperWidth = '58mm' | '80mm';
@@ -152,9 +153,10 @@ function PrintOrderPageInner({ id }: { id: string }) {
     (order.pointsUsed || 0) +
     (order.walletUsed || 0);
 
-  const orderNum = order.orderNumber.startsWith('#')
-    ? order.orderNumber
-    : `#${order.orderNumber}`;
+  const shortOrderNo = formatShortTxNo(order.orderNumber);
+  const orderNum = shortOrderNo.startsWith('#')
+    ? shortOrderNo
+    : `#${shortOrderNo}`;
 
   const dateStr = order.createdAt
     ? new Date(order.createdAt).toLocaleString('id-ID', {

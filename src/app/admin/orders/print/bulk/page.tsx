@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Printer, FileText, Receipt } from 'lucide-react';
 import { getSalesOrders } from '@/lib/actions/sales.actions';
+import { formatShortTxNo } from '@/lib/ids';
 
 type OrderDetail = {
   id: string;
@@ -113,6 +114,7 @@ function A4Doc({ order, store, fmtDate, fmtTime, isLast }: { order: OrderDetail;
       <div className="flex justify-between items-start mb-6 pb-4 border-b-2 border-slate-900">
         <div><h1 className="text-2xl font-black">{store.name}</h1><p className="text-xs text-slate-500">{store.address}</p><p className="text-xs text-slate-500">Tel: {store.phone}</p></div>
         <div className="text-right"><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">INVOICE</p><p className="text-xl font-black">{order.soNumber}</p><p className="text-xs text-slate-500">{String(fmtDate(order.createdAt))} · {String(fmtTime(order.createdAt))}</p></div>
+        <div className="text-right"><p className="text-[10px] font-black uppercase tracking-widest text-slate-400">INVOICE</p><p className="text-xl font-black">{formatShortTxNo(order.soNumber)}</p><p className="text-xs text-slate-500">{String(fmtDate(order.createdAt))} · {String(fmtTime(order.createdAt))}</p></div>
       </div>
       <div className="mb-4 p-3 bg-slate-50 rounded-xl"><p className="text-[10px] font-black uppercase text-slate-400 mb-1">Pelanggan</p><p className="font-black text-sm">{order.customer?.name || 'Walk-in'}</p>{order.customer?.phone && <p className="text-xs text-slate-500">{order.customer.phone}</p>}</div>
       <table className="w-full text-xs mb-4">
@@ -138,6 +140,7 @@ function ThermalDoc({ order, store, pw, fmtDate, fmtTime, isLast }: { order: Ord
       <div className="border-t border-dashed my-1.5" />
       <div className="mb-1.5">
         <div className="flex justify-between"><span>No:</span><span className="font-bold">{order.soNumber}</span></div>
+        <div className="flex justify-between"><span>No:</span><span className="font-bold">{formatShortTxNo(order.soNumber)}</span></div>
         <div className="flex justify-between"><span>Tgl:</span><span>{String(fmtDate(order.createdAt))}</span></div>
         <div className="flex justify-between"><span>Jam:</span><span>{String(fmtTime(order.createdAt))}</span></div>
         <div className="flex justify-between"><span>Cust:</span><span className="font-bold">{order.customer?.name || 'Walk-in'}</span></div>
