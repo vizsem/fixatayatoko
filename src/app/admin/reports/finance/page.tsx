@@ -341,7 +341,14 @@ let unsub: (() => void) | undefined;
           if (!(created >= startDate && created <= endDate)) return;
           const amount = Number(data.amount || 0);
           const catLabel = data.category ? `Operasional (${data.category})` : 'Operasional';
-          const pm = (data.paymentMethod || 'CASH').toUpperCase();
+          const rawPm = String(data.paymentMethod || 'CASH').trim().toUpperCase();
+          const pm = rawPm.includes('TUNAI') || rawPm === 'CASH'
+            ? 'CASH'
+            : rawPm.includes('TRANSFER')
+            ? 'TRANSFER'
+            : rawPm.includes('QRIS')
+            ? 'QRIS'
+            : rawPm;
 
           financeRecords.push({
             id: `OPR-${d.id}`,
@@ -369,7 +376,14 @@ let unsub: (() => void) | undefined;
           const data = d.data() as any;
           const created = parseDateAny(data.createdAt);
           if (!(created >= startDate && created <= endDate)) return;
-          const pm = (data.paymentMethod || 'CASH').toUpperCase();
+          const rawPm = String(data.paymentMethod || 'CASH').trim().toUpperCase();
+          const pm = rawPm.includes('TUNAI') || rawPm === 'CASH'
+            ? 'CASH'
+            : rawPm.includes('TRANSFER')
+            ? 'TRANSFER'
+            : rawPm.includes('QRIS')
+            ? 'QRIS'
+            : rawPm;
           const isPaid = data.paymentStatus === 'LUNAS' && ['CASH', 'TRANSFER', 'QRIS'].includes(pm);
 
           if (isPaid) {
