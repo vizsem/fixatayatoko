@@ -34,6 +34,7 @@ import {
   hitungPetaModalPembelian,
   PRODUK_RINGKAS,
 } from '@/lib/hpp';
+import { formatShortTxNo } from '@/lib/ids';
 
 type SaleItem = {
   id: string;
@@ -223,7 +224,7 @@ export default function SalesReport() {
           // Catat untuk tab Riwayat Transaksi
           salesList.push({
             id: orderDoc.id,
-            soNumber: orderIdDisplay,
+            soNumber: formatShortTxNo(orderIdDisplay),
             date: created.toISOString(),
             productName: pName,
             productId: pid,

@@ -9,6 +9,7 @@ import { toast } from 'react-hot-toast';
 import { supabase } from '@/lib/supabase';
 
 import { sbGetDoc, sbUpdateDoc } from '@/lib/supabase-helpers';
+import { formatShortTxNo } from '@/lib/ids';
 type OrderItem = {
   id: string;
   name: string;
@@ -151,8 +152,8 @@ export default function PublicOrderDetailPage() {
         {/* Order Identity Card */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 text-center">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">ID Pesanan</p>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-3">
-            {order.orderId || `#${order.id.substring(0, 8).toUpperCase()}`}
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-3" title={order.orderId || order.id}>
+            {formatShortTxNo(order.orderId || `#${order.id.substring(0, 8).toUpperCase()}`)}
           </h2>
           <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold border ${statusCfg.color} ${statusCfg.bg} ${statusCfg.border}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${isPending ? 'animate-pulse bg-amber-500' : 'bg-current opacity-60'}`} />

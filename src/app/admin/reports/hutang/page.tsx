@@ -15,6 +15,7 @@ import { Toaster } from 'react-hot-toast';
 import notify from '@/lib/notify';
 import { getDebtReport, markCustomerDebtPaid, DebtSummary, SupplierDebt, CustomerDebt } from '@/lib/actions/debt-report.actions';
 import { payPurchaseDebt } from '@/lib/actions/purchase.actions';
+import { formatShortTxNo } from '@/lib/ids';
 import * as XLSX from 'xlsx';
 
 const fmtCurrency = (n: number) =>
@@ -382,7 +383,7 @@ export default function HutangReportPage() {
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
-                              <span className="font-black text-gray-900 text-sm">{d.poNumber}</span>
+                              <span className="font-black text-gray-900 text-sm" title={d.poNumber}>{formatShortTxNo(d.poNumber)}</span>
                               {d.isOverdue && (
                                 <span className="flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-bold">
                                   <AlertTriangle size={10} /> JATUH TEMPO
@@ -545,7 +546,7 @@ export default function HutangReportPage() {
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h3 className="font-black text-gray-900 text-lg">Lunasi Hutang Supplier</h3>
-                <p className="text-xs text-gray-400 mt-0.5">{payModal.poNumber} — {payModal.supplierName}</p>
+                <p className="text-xs text-gray-400 mt-0.5" title={payModal.poNumber}>{formatShortTxNo(payModal.poNumber)} — {payModal.supplierName}</p>
               </div>
               <button onClick={() => setPayModal(null)} className="p-2 rounded-xl hover:bg-gray-100 transition">
                 <X size={18} className="text-gray-400" />

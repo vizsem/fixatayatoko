@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { EmptyState, SkeletonList } from '@/components/UIState';
 import { OrderTimeline } from '@/components/orders/OrderTimeline';
 import { supabase } from '@/lib/supabase';
+import { formatShortTxNo } from '@/lib/ids';
 
 type FirebaseOrder = {
   status?: string;
@@ -157,7 +158,7 @@ export default function UserOrdersPage() {
                         <Package size={20} />
                       </div>
                       <div>
-                        <h4 className="text-sm font-black text-slate-900">{order.orderId || `ATY-${order.id.slice(0, 5).toUpperCase()}`}</h4>
+                        <h4 className="text-sm font-black text-slate-900" title={order.orderId || order.id}>{formatShortTxNo(order.orderId || `ATY-${order.id.slice(0, 5).toUpperCase()}`)}</h4>
                         <p className="text-xs text-slate-400 font-medium mt-0.5">
                           {order.createdAt.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </p>
