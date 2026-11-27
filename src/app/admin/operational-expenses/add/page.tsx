@@ -17,12 +17,27 @@ export default function AddOperationalExpensePage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [category, setCategory] = useState('Lainnya');
+  const [customCategory, setCustomCategory] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Kas Tunai');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
 
-  const categories = ['Listrik', 'Air', 'Gaji', 'Packing', 'Bensin', 'Pajak', 'Lainnya'];
+  const categories = [
+    'Listrik',
+    'Air',
+    'Gaji',
+    'Packing',
+    'Bensin',
+    'Sewa Tempat',
+    'Internet/WiFi',
+    'Perawatan/Servis',
+    'Konsumsi',
+    'Pajak',
+    'Lainnya',
+  ];
+  const paymentMethods = ['Kas Tunai', 'Transfer Bank', 'QRIS', 'Lainnya'];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,10 +68,13 @@ export default function AddOperationalExpensePage() {
         }
       }
 
+      const finalCategory = category === '__CUSTOM__' ? (customCategory.trim() || 'Lainnya') : category;
+
       // Add expense via Server Action
       const res = await createExpense({
-        category,
+        category: finalCategory,
         amount: Number(amount),
+        paymentMethod,
         date: new Date(date),
         description,
         proofOfPayment: proofUrl || undefined,
@@ -95,21 +113,50 @@ export default function AddOperationalExpensePage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             
-            {/* Category */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Kategori Pengeluaran <span className="text-red-500">*</span>
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                required
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
+            {/* Category & Payment Method */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Kategori Pengeluaran <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-sm font-medium"
+                  required
+                >
+                  {categories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                  <option value="__CUSTOM__">+ Kategori Lain...</option>
+                </select>
+                {category === '__CUSTOM__' && (
+                  <input
+                    type="text"
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    placeholder="Ketik nama kategori baru"
+                    className="mt-2 w-full px-4 py-2 border border-emerald-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Sumber Dana <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-sm font-medium"
+                  required
+                >
+                  {paymentMethods.map(pm => (
+                    <option key={pm} value={pm}>{pm}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Amount */}

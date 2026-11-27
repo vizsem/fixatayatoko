@@ -272,10 +272,11 @@ export interface StockValidation {
 
 export interface OperationalExpense {
     id: string;
-    category: string; // Listrik, Air, Gaji, Packing, Bensin, Lainnya
+    category: string; // Listrik, Air, Gaji, Packing, Bensin, Sewa Tempat, dll
     amount: number;
     date: FirestoreTimestamp | Date | null;
     description: string;
+    paymentMethod?: string; // Kas Tunai, Transfer Bank, QRIS, Lainnya
     proofOfPayment?: string; // URL gambar bukti pembayaran
     recordedBy?: string; // User ID yang mencatat
     createdAt?: FirestoreTimestamp | Date | null;

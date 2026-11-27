@@ -42,6 +42,8 @@ export async function getExpenses(filters?: {
         category: raw.category || 'Operasional',
         amount: Number(raw.amount || 0),
         description: raw.description || raw.catatan || '',
+        paymentMethod: raw.paymentMethod || 'Kas Tunai',
+        proofOfPayment: raw.proofOfPayment || undefined,
         date: parseDate(raw.date || e.created_at),
       };
     });
@@ -67,6 +69,7 @@ export async function createExpense(data: {
   category: string
   amount: number
   description?: string
+  paymentMethod?: string
   date: Date
   proofOfPayment?: string
 }) {
@@ -80,6 +83,7 @@ export async function createExpense(data: {
       category: data.category,
       amount: Number(data.amount),
       description: data.description || '',
+      paymentMethod: data.paymentMethod || 'Kas Tunai',
       date: data.date.toISOString(),
       proofOfPayment: data.proofOfPayment || null,
       createdAt: new Date().toISOString(),
@@ -111,6 +115,7 @@ export async function updateExpense(
     category: string
     amount: number
     description?: string
+    paymentMethod?: string
     date: Date
     proofOfPayment?: string
   }
@@ -131,6 +136,7 @@ export async function updateExpense(
       category: data.category,
       amount: Number(data.amount),
       description: data.description || '',
+      paymentMethod: data.paymentMethod || existingRaw.paymentMethod || 'Kas Tunai',
       date: data.date.toISOString(),
       proofOfPayment: data.proofOfPayment ?? existingRaw.proofOfPayment ?? null,
       updatedAt: new Date().toISOString(),
