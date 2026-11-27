@@ -22,6 +22,7 @@ import { findPricesBelowTarget } from '@/lib/pricing-review';
 import { MARKETPLACE_CATEGORIES, classifyProduct } from '@/lib/marketplace-categories';
 import { inheritParentUnits } from '@/lib/normalize';
 import { getCategoryPrefix, generateVariantSuffix, formatDisplaySku } from '@/lib/sku-generator';
+import { SATUAN_VALUES, type SatuanItem } from '@/lib/constants/satuan';
 
 /**
  * Apakah pemanggil saat ini terbukti staf (admin/owner/kasir/gudang)?
@@ -476,6 +477,19 @@ export async function saveEditedProduct(id: string, payload: {
       }
     }
 
+    // Daftarkan otomatis satuan custom baru agar muncul di dropdown seluruh halaman
+    try {
+      const unitCodes: string[] = [
+        payload.unit,
+        ...(Array.isArray(payload.raw_data?.units)
+          ? payload.raw_data.units.map((u: any) => u?.code)
+          : []),
+      ].filter(Boolean);
+      await registerCustomUnitsInternal(unitCodes);
+    } catch (e) {
+      console.warn('Auto-register satuan custom gagal:', e);
+    }
+
     revalidatePath('/admin/products');
     revalidatePath('/admin/inventory');
     revalidatePath(`/admin/products/edit/${id}`);
@@ -882,6 +896,17 @@ export async function addProductFull(payload: {
           updated_at: now,
         });
       }
+    }
+
+    // Daftarkan otomatis satuan custom baru agar muncul di dropdown seluruh halaman
+    try {
+      const unitCodes: string[] = [
+        baseUnit,
+        ...(Array.isArray(payload.units) ? payload.units.map((u) => u?.code) : []),
+      ].filter(Boolean);
+      await registerCustomUnitsInternal(unitCodes);
+    } catch (e) {
+      console.warn('Auto-register satuan custom gagal:', e);
     }
 
     revalidatePath('/admin/products');
@@ -2273,6 +2298,78 @@ export async function saveStorePricingPolicy(policy: {
     return { success: true };
   } catch (err: any) {
     console.error('saveStorePricingPolicy error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Helper internal untuk mendaftarkan satuan custom ke settings (`id = 'custom_units'`)
+ * agar otomatis tersedia di seluruh dropdown satuan produk.
+ */
+async function registerCustomUnitsInternal(codes: string[]): Promise<SatuanItem[]> {
+  const cleanCodes = Array.from(
+    new Set(
+      (codes || [])
+        .map((c) => String(c || '').trim().toUpperCase())
+        .filter((c) => c.length > 0 && !SATUAN_VALUES.includes(c))
+    )
+  );
+
+  const { data } = await supabaseAdmin
+    .from('settings')
+    .select('raw_data')
+    .eq('id', 'custom_units')
+    .maybeSingle();
+
+  const existing: SatuanItem[] = Array.isArray(data?.raw_data?.units)
+    ? data.raw_data.units
+    : [];
+
+  if (cleanCodes.length === 0) return existing;
+
+  const existingSet = new Set(existing.map((u) => String(u.value || '').toUpperCase()));
+  const toAdd = cleanCodes
+    .filter((code) => !existingSet.has(code))
+    .map((code) => ({ value: code, label: code, desc: 'Satuan Custom' }));
+
+  if (toAdd.length === 0) return existing;
+
+  const merged = [...existing, ...toAdd];
+  const now = new Date().toISOString();
+  const { error } = await supabaseAdmin.from('settings').upsert({
+    id: 'custom_units',
+    raw_data: { units: merged, updatedAt: now },
+    updated_at: now,
+  });
+  if (error) throw error;
+  return merged;
+}
+
+export async function getCustomUnits(): Promise<SatuanItem[]> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('settings')
+      .select('raw_data')
+      .eq('id', 'custom_units')
+      .maybeSingle();
+    if (Array.isArray(data?.raw_data?.units)) {
+      return data.raw_data.units;
+    }
+  } catch (err) {
+    console.warn('getCustomUnits warning:', err);
+  }
+  return [];
+}
+
+export async function registerCustomUnits(
+  codes: string[]
+): Promise<{ success: boolean; units?: SatuanItem[]; error?: string }> {
+  await requireStaff();
+  try {
+    const units = await registerCustomUnitsInternal(codes);
+    return { success: true, units };
+  } catch (err: any) {
+    console.error('registerCustomUnits error:', err);
     return { success: false, error: err.message };
   }
 }

@@ -12,9 +12,9 @@ import notify from '@/lib/notify';
 import CameraBarcodeScannerModal from '@/components/scanner/CameraBarcodeScannerModal';
 import { playScanBeep } from '@/lib/sound';
 import { MARGIN_RULES, recommendSellingPrice, type PricingStrategy, type UnitOption } from '@/lib/normalize';
-import { SATUAN_LIST, SATUAN_DEFAULT, normalizeSatuan } from '@/lib/constants/satuan';
+import { SATUAN_LIST, SATUAN_DEFAULT, normalizeSatuan, mergeSatuanList, type SatuanItem } from '@/lib/constants/satuan';
 import imageCompression from 'browser-image-compression';
-import { addProductFull, getCategories, batchAddVariantsAction, generateNextSkuAction } from '@/lib/actions/product.actions';
+import { addProductFull, getCategories, batchAddVariantsAction, generateNextSkuAction, getCustomUnits, registerCustomUnits } from '@/lib/actions/product.actions';
 import { generateVariantSku } from '@/lib/sku-generator';
 import { uploadImageAction } from '@/lib/actions/upload.actions';
 import { sbGetDoc } from '@/lib/supabase-helpers';
@@ -82,6 +82,11 @@ export default function AddProductPage() {
     { code: 'KARTON', contains: 0, price: 0, label: '' },
   ]);
   const [newUnitCode, setNewUnitCode] = useState('');
+  const [customUnits, setCustomUnits] = useState<SatuanItem[]>([]);
+  const [showCustomBaseUnitInput, setShowCustomBaseUnitInput] = useState(false);
+  const [customBaseUnitInput, setCustomBaseUnitInput] = useState('');
+  const [showCustomAddUnitInput, setShowCustomAddUnitInput] = useState(false);
+  const [customAddUnitInput, setCustomAddUnitInput] = useState('');
   const [hideBaseUnit, setHideBaseUnit] = useState(false);
   const [defaultSellUnit, setDefaultSellUnit] = useState('');
   const [newKategoriInput, setNewKategoriInput] = useState('');
@@ -434,15 +439,45 @@ export default function AddProductPage() {
     }));
   };
 
-  const handleAddUnit = () => {
-    if (!newUnitCode) return;
-    const code = normalizeSatuan(newUnitCode);
+  const allSatuanOptions = useMemo(
+    () => mergeSatuanList([...customUnits, ...units.map((u) => u.code)]),
+    [customUnits, units]
+  );
+
+  useEffect(() => {
+    getCustomUnits().then(setCustomUnits).catch(() => {});
+  }, []);
+
+  const applyBaseUnit = async (rawCode: string, registerIfNew = false) => {
+    const newBase = normalizeSatuan(rawCode);
+    setFormData((prev) => ({ ...prev, Satuan: newBase }));
+    setUnits((prev) => {
+      if (prev.length === 0) return [{ code: newBase || 'PCS', contains: 1, price: formData.Ecer, label: '' }];
+      const next = [...prev];
+      next[0] = { ...next[0], code: newBase || 'PCS' };
+      return next;
+    });
+    if (registerIfNew && newBase) {
+      const res = await registerCustomUnits([newBase]);
+      if (res.success && res.units) setCustomUnits(res.units);
+      notify.admin.success(`Satuan dasar "${newBase}" dipilih & didaftarkan`);
+    }
+  };
+
+  const handleAddUnit = async (explicitCode?: string) => {
+    const raw = explicitCode ?? newUnitCode;
+    if (!raw || raw === '__CUSTOM__') return;
+    const code = normalizeSatuan(raw);
     if (units.some(u => u.code === code)) {
       notify.admin.error('Satuan sudah ada');
       return;
     }
     setUnits([...units, { code, contains: 0, price: 0, label: '' }]);
     setNewUnitCode('');
+    setShowCustomAddUnitInput(false);
+    setCustomAddUnitInput('');
+    const res = await registerCustomUnits([code]);
+    if (res.success && res.units) setCustomUnits(res.units);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -879,8 +914,71 @@ export default function AddProductPage() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
               <div className="space-y-1">
-                <label className="text-xs font-black uppercase text-gray-400 ml-2">Satuan</label>
-                <input required type="text" placeholder="Pcs/Dus" className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold" value={formData.Satuan} onChange={e => setFormData({ ...formData, Satuan: e.target.value })} />
+                <label className="text-xs font-black uppercase text-gray-400 ml-2">Satuan Dasar</label>
+                {!showCustomBaseUnitInput ? (
+                  <select
+                    required
+                    className="w-full p-4 bg-gray-50 rounded-2xl border-none font-bold uppercase outline-none"
+                    value={String(formData.Satuan || 'PCS').trim().toUpperCase()}
+                    onChange={(e) => {
+                      if (e.target.value === '__CUSTOM__') {
+                        setShowCustomBaseUnitInput(true);
+                        setCustomBaseUnitInput('');
+                      } else {
+                        applyBaseUnit(e.target.value, false);
+                      }
+                    }}
+                  >
+                    {allSatuanOptions.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label} ({s.desc})
+                      </option>
+                    ))}
+                    <option value="__CUSTOM__">+ Buat Satuan Baru...</option>
+                  </select>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Mis: RENTENG"
+                      className="w-full p-4 bg-white rounded-2xl border border-emerald-400 font-bold uppercase outline-none"
+                      value={customBaseUnitInput}
+                      onChange={(e) => setCustomBaseUnitInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (customBaseUnitInput.trim()) {
+                            applyBaseUnit(customBaseUnitInput, true);
+                            setShowCustomBaseUnitInput(false);
+                            setCustomBaseUnitInput('');
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (customBaseUnitInput.trim()) {
+                          applyBaseUnit(customBaseUnitInput, true);
+                          setShowCustomBaseUnitInput(false);
+                          setCustomBaseUnitInput('');
+                        }
+                      }}
+                      disabled={!customBaseUnitInput.trim()}
+                      className="px-3 py-3 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase shrink-0 disabled:opacity-40"
+                    >
+                      Pakai
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowCustomBaseUnitInput(false); setCustomBaseUnitInput(''); }}
+                      className="px-3 py-3 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold shrink-0"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-black uppercase text-gray-400 ml-2 text-emerald-600">Stok Awal</label>
@@ -1295,25 +1393,69 @@ export default function AddProductPage() {
                 <Tag size={18} />
                 <h3 className="text-xs font-black uppercase tracking-widest">Satuan Jual</h3>
               </div>
-              <div className="flex gap-2">
-                <select
-                  className="bg-gray-50 px-3 py-2 rounded-xl text-xs font-bold uppercase outline-none border focus:border-blue-500"
-                  value={newUnitCode}
-                  onChange={(e) => setNewUnitCode(e.target.value)}
-                >
-                  <option value="">-- Pilih Satuan --</option>
-                  {SATUAN_LIST.filter(s => !units.some(u => u.code === s.value)).map(s => (
-                    <option key={s.value} value={s.value}>{s.label} – {s.desc}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={handleAddUnit}
-                  disabled={!newUnitCode}
-                  className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black uppercase hover:bg-gray-800 transition-all disabled:opacity-40"
-                >
-                  + Tambah
-                </button>
+              <div className="flex flex-wrap gap-2">
+                {!showCustomAddUnitInput ? (
+                  <>
+                    <select
+                      className="bg-gray-50 px-3 py-2 rounded-xl text-xs font-bold uppercase outline-none border focus:border-blue-500"
+                      value={newUnitCode}
+                      onChange={(e) => {
+                        if (e.target.value === '__CUSTOM__') {
+                          setShowCustomAddUnitInput(true);
+                          setNewUnitCode('');
+                        } else {
+                          setNewUnitCode(e.target.value);
+                        }
+                      }}
+                    >
+                      <option value="">-- Pilih Satuan --</option>
+                      {allSatuanOptions.filter(s => !units.some(u => u.code === s.value)).map(s => (
+                        <option key={s.value} value={s.value}>{s.label} – {s.desc}</option>
+                      ))}
+                      <option value="__CUSTOM__">+ Ketik Satuan Baru...</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => handleAddUnit()}
+                      disabled={!newUnitCode}
+                      className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black uppercase hover:bg-gray-800 transition-all disabled:opacity-40"
+                    >
+                      + Tambah
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Mis: RENTENG"
+                      className="w-32 px-2.5 py-2 bg-white rounded-xl text-xs font-bold uppercase outline-none border border-blue-400"
+                      value={customAddUnitInput}
+                      onChange={(e) => setCustomAddUnitInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (customAddUnitInput.trim()) handleAddUnit(customAddUnitInput);
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => customAddUnitInput.trim() && handleAddUnit(customAddUnitInput)}
+                      disabled={!customAddUnitInput.trim()}
+                      className="bg-black text-white px-3 py-2 rounded-xl text-xs font-black uppercase disabled:opacity-40"
+                    >
+                      + Tambah
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowCustomAddUnitInput(false); setCustomAddUnitInput(''); }}
+                      className="bg-gray-100 text-gray-600 px-2.5 py-2 rounded-xl text-xs font-bold"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             {/* Toggle: Tidak Dijual Per Satuan Dasar / Ecer (Hide PCS) */}
